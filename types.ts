@@ -15,6 +15,14 @@ export interface WinnerInfo {
   depositAmount: number;
 }
 
+export interface UserProfile {
+  payoutValue: string;
+  payoutType: PayoutType;
+  isReferralVerified: boolean;
+  participationCount: number;
+  totalWon: number;
+}
+
 export interface Contest {
   id: string;
   title: string;
@@ -23,7 +31,7 @@ export interface Contest {
   prizeRub: number;
   prizeUsd: number;
   createdAt: number;
-  participantCount?: number;
+  participantCount: number;
   isCompleted?: boolean;
   winners?: WinnerInfo[];
   winnerCount: number;

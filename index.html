@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Beef Contest</title>
+    <title>Розыгрыши от Лудовара</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -21,6 +21,21 @@
         }
         ::-webkit-scrollbar {
             width: 0px;
+        }
+        @keyframes roulette { 
+            0% { transform: translateX(0); } 
+            100% { transform: translateX(-4000px); } 
+        }
+        .animate-roulette-scroll { 
+            animation: roulette 5s cubic-bezier(0.1, 0.7, 0.1, 1) forwards; 
+        }
+        @keyframes shake { 
+            0%, 100% { transform: translateX(0); } 
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 
+            20%, 40%, 60%, 80% { transform: translateX(5px); } 
+        }
+        .animate-shake-once { 
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; 
         }
     </style>
 <script type="importmap">
