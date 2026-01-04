@@ -81,9 +81,9 @@ const App: React.FC = () => {
   const [payoutInput, setPayoutInput] = useState('');
   const [isFinalizing, setIsFinalizing] = useState(false);
 
-  // Roulette
-  const [isRolling, setIsRolling] = useState(false);
-  const [rouletteItems, setRouletteItems] = useState<{name: string, isPremium: boolean}[]>([]);
+  // Loading Winner state
+  const [isPickingWinner, setIsPickingWinner] = useState(false);
+  const [pickingStatus, setPickingStatus] = useState('Анализируем активности...');
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -197,14 +197,15 @@ const App: React.FC = () => {
     const partData = await partRes.json();
     const pool = partData.result ? JSON.parse(partData.result) : [];
     
-    // Пул победителей — ТОЛЬКО БОТЫ из общего списка участников этого конкурса
+    // Пул победителей — ТОЛЬКО БОТЫ
     const botParticipants = pool.filter((p: any) => p.isBot);
-    
-    // Если ботов мало в этом конкретном конкурсе, подмешиваем из BOTS_POOL (хотя они должны быть там)
     const availableBots = botParticipants.length >= contest.winnerCount ? botParticipants : [...botParticipants, ...BOTS_POOL];
 
     const winners: WinnerInfo[] = [];
     const updatedProfiles = { ...globalProfiles };
+    
+    // Делим приз на количество победителей
+    const prizePerWinner = Math.floor(contest.prizeRub / contest.winnerCount);
 
     for(let i=0; i < Math.min(contest.winnerCount, availableBots.length); i++) {
       const luckyIndex = Math.floor(Math.random() * availableBots.length);
@@ -215,53 +216,58 @@ const App: React.FC = () => {
         payoutValue: lucky.payout || lucky.payoutValue, 
         payoutType: (lucky.type || lucky.payoutType || 'card') as PayoutType, 
         registeredAt: lucky.registeredAt, 
-        depositAmount: lucky.depositAmount 
+        depositAmount: lucky.depositAmount,
+        prizeWon: prizePerWinner
       });
 
-      // Обновляем статистику бота в глобальной базе
       const botKey = `bot_${lucky.name}`;
       const currentStats = updatedProfiles[botKey] || { participationCount: 1, totalWon: 0, registeredAt: lucky.registeredAt, depositAmount: lucky.depositAmount };
       updatedProfiles[botKey] = {
         ...currentStats,
-        totalWon: (currentStats.totalWon || 0) + contest.prizeRub,
+        totalWon: (currentStats.totalWon || 0) + prizePerWinner,
         name: lucky.name
       };
 
       availableBots.splice(luckyIndex, 1);
     }
 
-    // Сохраняем обновленные профили в Upstash
-    setGlobalProfiles(updatedProfiles);
-    fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
-      method: 'POST', 
-      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
-      body: JSON.stringify(updatedProfiles) 
-    });
+    setPickingStatus('Анализируем активности...');
+    setIsPickingWinner(true);
 
-    const rItems = Array.from({ length: 60 }, () => {
-      const p = pool[Math.floor(Math.random() * pool.length)] || BOTS_POOL[Math.floor(Math.random() * BOTS_POOL.length)];
-      return { name: p.name, isPremium: Math.random() < 0.15 };
-    });
-    
-    // Устанавливаем победителя строго в ячейку, на которую указывает стрелка (обычно 52 при текущей анимации)
-    if (winners.length > 0) {
-      rItems[52] = { name: winners[0].name, isPremium: Math.random() < 0.15 };
-    }
-    
-    setRouletteItems(rItems);
-    setIsRolling(true);
+    const statusSteps = [
+      'Проверка условий участия...',
+      'Верификация аккаунтов...',
+      'Случайный выбор победителей...',
+      'Запись результатов в блокчейн...',
+      'Почти готово!'
+    ];
+
+    let stepIdx = 0;
+    const interval = setInterval(() => {
+      if (stepIdx < statusSteps.length) {
+        setPickingStatus(statusSteps[stepIdx]);
+        stepIdx++;
+      }
+    }, 800);
 
     setTimeout(async () => {
+      clearInterval(interval);
+      setGlobalProfiles(updatedProfiles);
+      fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
+        method: 'POST', 
+        headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
+        body: JSON.stringify(updatedProfiles) 
+      });
+
       const updated = contests.map(c => c.id === contestId ? { ...c, isCompleted: true, winners } : c);
       await saveContestsGlobal(updated);
-      setIsRolling(false);
+      setIsPickingWinner(false);
       setAdminSelectedContest(updated.find(c => c.id === contestId)!);
       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('heavy');
     }, 5000);
   };
 
   const registerParticipant = async (contestId: string, payout: string, type: PayoutType) => {
-    // Выбираем случайных ботов из расширенного пула
     const botCount = Math.floor(Math.random() * 8) + 5;
     const selectedBots = [];
     const tempPool = [...BOTS_POOL];
@@ -272,7 +278,6 @@ const App: React.FC = () => {
       const bot = tempPool[idx];
       selectedBots.push(bot);
       
-      // Обновляем кол-во участий бота в глобальной базе
       const botKey = `bot_${bot.name}`;
       const currentStats = updatedProfiles[botKey] || { participationCount: 0, totalWon: 0, registeredAt: bot.registeredAt, depositAmount: bot.depositAmount };
       updatedProfiles[botKey] = {
@@ -284,7 +289,6 @@ const App: React.FC = () => {
       tempPool.splice(idx, 1);
     }
 
-    // Сохраняем статистику ботов
     setGlobalProfiles(updatedProfiles);
     fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
       method: 'POST', 
@@ -326,7 +330,6 @@ const App: React.FC = () => {
     if (stats) {
       setViewedProfile({ name, ...stats, isBot });
     } else {
-      // Если статов нет, показываем дефолт
       setViewedProfile({ name, participationCount: 1, totalWon: 0, isBot });
     }
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
@@ -375,7 +378,7 @@ const App: React.FC = () => {
       )}
 
       {/* View Switcher for Admin */}
-      {isAdmin && !isRolling && (
+      {isAdmin && !isPickingWinner && (
         <div className="fixed top-4 right-4 z-[60]">
           <button onClick={() => { setView(view === 'admin' ? 'user' : 'admin'); setError(null); }} className="p-3 bg-blue-600 text-white rounded-2xl shadow-xl active:scale-90 transition-all">
             {view === 'admin' ? <ChevronLeftIcon className="w-6 h-6"/> : <ShieldCheckIcon className="w-6 h-6"/>}
@@ -434,6 +437,7 @@ const App: React.FC = () => {
                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                <span className="text-[8px] font-black bg-blue-500 text-white px-2 py-0.5 rounded uppercase">{w.depositAmount.toLocaleString()} ₽ DEP</span>
                                <span className="text-[8px] font-black bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded uppercase">{w.registeredAt}</span>
+                               <span className="text-[9px] font-black text-green-600 mt-1">+{w.prizeWon.toLocaleString()} ₽</span>
                             </div>
                           </div>
                           <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800/50 rounded-2xl border dark:border-slate-700 shadow-sm">
@@ -465,20 +469,21 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {isRolling && (
-            <div className="fixed inset-0 z-[300] bg-black/95 flex flex-col items-center justify-center p-8 space-y-12">
-              <h2 className="text-3xl font-black text-white italic tracking-tighter">BEEF ROULETTE</h2>
-              <div className="relative w-full max-w-[320px] overflow-hidden rounded-3xl h-28 bg-slate-900 flex items-center border-4 border-white/5 shadow-2xl">
-                <div className="absolute left-1/2 -translate-x-1/2 h-full w-1 bg-blue-500 z-10 shadow-[0_0_20px_rgba(37,99,235,1)]"></div>
-                <div className="flex animate-roulette-scroll items-center space-x-4 pl-[160px]">
-                  {rouletteItems.map((item, idx) => (
-                    <div key={idx} className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap border bg-slate-800 text-white/50 border-white/5`}>
-                      {item.name} {item.isPremium && <StarIcon className="w-3 h-3 inline fill-blue-400 text-blue-400"/>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs font-black text-blue-500 uppercase tracking-widest animate-pulse">Определяем победителей...</p>
+          {isPickingWinner && (
+            <div className="fixed inset-0 z-[300] bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center p-8 space-y-12">
+               <div className="relative">
+                  <div className="absolute inset-0 bg-blue-500/20 blur-[80px] rounded-full animate-pulse"></div>
+                  <div className="relative bg-white/5 p-10 rounded-[3rem] border border-white/10 shadow-2xl animate-bounce">
+                     <TrophyIcon className="w-24 h-24 text-blue-500"/>
+                  </div>
+               </div>
+               <div className="text-center space-y-4 max-w-[280px]">
+                  <h2 className="text-3xl font-black text-white italic tracking-tighter">ВЫБОР ПОБЕДИТЕЛЯ</h2>
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                     <div className="h-full bg-blue-600 animate-loading-progress rounded-full shadow-[0_0_15px_rgba(37,99,235,0.8)]"></div>
+                  </div>
+                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] animate-pulse">{pickingStatus}</p>
+               </div>
             </div>
           )}
         </div>
@@ -703,6 +708,7 @@ const App: React.FC = () => {
                                <div className="overflow-hidden mr-4">
                                  <p className="font-black text-blue-600 text-lg truncate leading-none mb-1">{w.name}</p>
                                  <p className="text-[9px] opacity-40 uppercase font-black tracking-tight leading-tight">Рега: {w.registeredAt} • Деп: {w.depositAmount.toLocaleString()} ₽</p>
+                                 <p className="text-[10px] font-black text-green-600 mt-1">ВЫИГРЫШ: +{w.prizeWon.toLocaleString()} ₽</p>
                                </div>
                                <div className="flex-shrink-0">
                                   <StarIcon className="w-6 h-6 fill-yellow-500 text-yellow-500"/>
@@ -742,8 +748,10 @@ const App: React.FC = () => {
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-up { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes loading-progress { 0% { width: 0%; } 100% { width: 100%; } }
         .animate-fade-in { animation: fade-in 0.4s ease-out; }
         .animate-slide-up { animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-loading-progress { animation: loading-progress 5s linear forwards; }
       `}</style>
     </div>
   );

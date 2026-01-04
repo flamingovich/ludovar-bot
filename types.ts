@@ -13,6 +13,7 @@ export interface WinnerInfo {
   payoutType: PayoutType;
   registeredAt: string;
   depositAmount: number;
+  prizeWon: number;
 }
 
 export interface UserProfile {
