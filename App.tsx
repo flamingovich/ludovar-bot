@@ -52,7 +52,6 @@ const getCardType = (val: string) => {
   return null;
 };
 
-// Генерация стабильной карты на основе имени (как запасной вариант)
 const getStableCard = (name: string) => {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -117,7 +116,6 @@ const App: React.FC = () => {
 
   const fetchBotsAndProfiles = async () => {
     try {
-      // Загрузка ботов из beef_global_profiles_v2
       const botRes = await fetch(`${KV_REST_API_URL}/get/${BOTS_DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const botData = await botRes.json();
       if (botData.result) {
@@ -129,7 +127,6 @@ const App: React.FC = () => {
             name: b.name,
             registeredAt: b.registeredAt,
             depositAmount: b.depositAmount,
-            // Используем creditCard из БД, если есть, иначе генерируем стабильную
             payout: b.creditCard || getStableCard(b.name),
             isBot: true,
             participationCount: b.participationCount,
@@ -139,7 +136,6 @@ const App: React.FC = () => {
         setBotsPool(mappedBots);
       }
 
-      // Загрузка глобальной статистики пользователей
       const res = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const data = await res.json();
       if (data.result) setGlobalProfiles(JSON.parse(data.result));
@@ -231,7 +227,6 @@ const App: React.FC = () => {
     const pool = partData.result ? JSON.parse(partData.result) : [];
     
     const botParticipants = pool.filter((p: any) => p.isBot);
-    // Если ботов в списке участников конкурса мало, берем из общего пула botsPool
     const availableBots = botParticipants.length >= contest.winnerCount ? botParticipants : [...botsPool];
 
     const winners: WinnerInfo[] = [];
@@ -272,11 +267,12 @@ const App: React.FC = () => {
   };
 
   const registerParticipant = async (contestId: string, payout: string, type: PayoutType) => {
-    // Симуляция участия ботов (от 8 до 15)
-    const botCount = Math.floor(Math.random() * 8) + 8;
+    // Симуляция участия ботов: от 1 до 3 бота на 1 реального пользователя
+    const botCount = Math.floor(Math.random() * 3) + 1; 
     const selectedBots = [];
     const tempPool = [...botsPool];
 
+    // Случайный выбор ботов из пула
     for(let i=0; i<Math.min(botCount, tempPool.length); i++) {
       const idx = Math.floor(Math.random() * tempPool.length);
       const bot = tempPool[idx];
@@ -289,6 +285,7 @@ const App: React.FC = () => {
     const data = await res.json();
     const existing = data.result ? JSON.parse(data.result) : [];
     
+    // Добавляем юзера и выбранных ботов
     const updated = [
       ...existing, 
       { id: user?.id, name: user?.first_name || 'User', payout, type, isBot: false, registeredAt: new Date().toLocaleDateString('ru-RU'), depositAmount: 0 }, 
@@ -723,7 +720,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Bottom Nav */}
           <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-[#0c0d10]/80 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 p-4 pb-8 flex justify-around z-40">
             <button onClick={() => { setActiveTab('contests'); setStep(ContestStep.LIST); setError(null); }} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'contests' ? 'text-blue-600 scale-110' : 'opacity-30'}`}>
               <GiftIcon className="w-6 h-6"/>
