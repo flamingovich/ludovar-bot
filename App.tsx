@@ -21,7 +21,8 @@ import {
   ClipboardDocumentCheckIcon,
   StarIcon,
   FlagIcon,
-  ArrowTopRightOnSquareIcon
+  ArrowTopRightOnSquareIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -31,6 +32,7 @@ const DB_KEY = 'beef_contests_v6_final';
 const ADMIN_ID = 7946967720;
 const PROFILE_KEY = 'beef_user_profile_final';
 const PARTICIPATION_KEY = 'beef_user_participations_final';
+const GLOBAL_PROFILES_KEY = 'beef_global_profiles_v2'; // Глобальная база всех профилей
 
 const BEEF_LINK = 'https://v.beef.gg/LUDOVAR';
 
@@ -61,6 +63,10 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Глобальная база профилей (загружается для просмотра чужих стат)
+  const [globalProfiles, setGlobalProfiles] = useState<Record<string, any>>({});
+  const [viewedProfile, setViewedProfile] = useState<any | null>(null);
+
   // Admin states
   const [newTitle, setNewTitle] = useState('');
   const [newPrizeRub, setNewPrizeRub] = useState<string>('');
@@ -83,6 +89,7 @@ const App: React.FC = () => {
     const tg = window.Telegram?.WebApp;
     if (tg) { tg.ready(); tg.expand(); if (tg.initDataUnsafe?.user) setUser(tg.initDataUnsafe.user); }
     fetchContests();
+    fetchGlobalProfiles();
     const pIds = localStorage.getItem(PARTICIPATION_KEY);
     if (pIds) setParticipatedIds(JSON.parse(pIds));
     const savedProfile = localStorage.getItem(PROFILE_KEY);
@@ -98,6 +105,27 @@ const App: React.FC = () => {
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
 
+  const fetchGlobalProfiles = async () => {
+    try {
+      const res = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const data = await res.json();
+      if (data.result) setGlobalProfiles(JSON.parse(data.result));
+    } catch (e) { console.error(e); }
+  };
+
+  const saveGlobalProfile = async (id: string, update: any) => {
+    const current = { ...globalProfiles };
+    current[id] = { ...(current[id] || { participationCount: 0, totalWon: 0 }), ...update };
+    setGlobalProfiles(current);
+    try {
+      await fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
+        method: 'POST', 
+        headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
+        body: JSON.stringify(current) 
+      });
+    } catch (e) { console.error(e); }
+  };
+
   const saveContestsGlobal = async (updated: Contest[]) => {
     setContests(updated);
     try { await fetch(`${KV_REST_API_URL}/set/${DB_KEY}`, { method: 'POST', headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, body: JSON.stringify(updated) }); } catch (e) { console.error(e); }
@@ -106,6 +134,13 @@ const App: React.FC = () => {
   const saveProfile = (updated: UserProfile) => {
     setProfile(updated);
     localStorage.setItem(PROFILE_KEY, JSON.stringify(updated));
+    if (user?.id) {
+      saveGlobalProfile(user.id.toString(), { 
+        participationCount: updated.participationCount, 
+        totalWon: updated.totalWon,
+        name: user.first_name
+      });
+    }
   };
 
   const isAdmin = useMemo(() => user?.id === ADMIN_ID, [user]);
@@ -162,31 +197,53 @@ const App: React.FC = () => {
     const partData = await partRes.json();
     const pool = partData.result ? JSON.parse(partData.result) : [];
     
-    // Пул из реальных участников и ФИКСИРОВАННЫХ ботов
-    const fullPool = pool.length > 5 ? pool : [...pool, ...BOTS_POOL];
+    // Пул победителей — ТОЛЬКО БОТЫ из общего списка участников этого конкурса
+    const botParticipants = pool.filter((p: any) => p.isBot);
+    
+    // Если ботов мало в этом конкретном конкурсе, подмешиваем из BOTS_POOL (хотя они должны быть там)
+    const availableBots = botParticipants.length >= contest.winnerCount ? botParticipants : [...botParticipants, ...BOTS_POOL];
 
     const winners: WinnerInfo[] = [];
-    for(let i=0; i < Math.min(contest.winnerCount, fullPool.length); i++) {
-      const luckyIndex = Math.floor(Math.random() * fullPool.length);
-      const lucky = fullPool[luckyIndex];
+    const updatedProfiles = { ...globalProfiles };
+
+    for(let i=0; i < Math.min(contest.winnerCount, availableBots.length); i++) {
+      const luckyIndex = Math.floor(Math.random() * availableBots.length);
+      const lucky = availableBots[luckyIndex];
+      
       winners.push({ 
         name: lucky.name, 
         payoutValue: lucky.payout || lucky.payoutValue, 
-        payoutType: (lucky.type || lucky.payoutType) as PayoutType, 
+        payoutType: (lucky.type || lucky.payoutType || 'card') as PayoutType, 
         registeredAt: lucky.registeredAt, 
         depositAmount: lucky.depositAmount 
       });
-      // Чтобы один и тот же не выиграл дважды в одном конкурсе
-      fullPool.splice(luckyIndex, 1);
+
+      // Обновляем статистику бота в глобальной базе
+      const botKey = `bot_${lucky.name}`;
+      const currentStats = updatedProfiles[botKey] || { participationCount: 1, totalWon: 0, registeredAt: lucky.registeredAt, depositAmount: lucky.depositAmount };
+      updatedProfiles[botKey] = {
+        ...currentStats,
+        totalWon: (currentStats.totalWon || 0) + contest.prizeRub,
+        name: lucky.name
+      };
+
+      availableBots.splice(luckyIndex, 1);
     }
 
+    // Сохраняем обновленные профили в Upstash
+    setGlobalProfiles(updatedProfiles);
+    fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
+      method: 'POST', 
+      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
+      body: JSON.stringify(updatedProfiles) 
+    });
+
     const rItems = Array.from({ length: 60 }, () => {
-      // Для рулетки используем весь доступный пул
-      const basePool = [...pool, ...BOTS_POOL];
-      const p = basePool[Math.floor(Math.random() * basePool.length)];
+      const p = pool[Math.floor(Math.random() * pool.length)] || BOTS_POOL[Math.floor(Math.random() * BOTS_POOL.length)];
       return { name: p.name, isPremium: Math.random() < 0.15 };
     });
     
+    // Устанавливаем победителя строго в ячейку, на которую указывает стрелка (обычно 52 при текущей анимации)
     if (winners.length > 0) {
       rItems[52] = { name: winners[0].name, isPremium: Math.random() < 0.15 };
     }
@@ -204,22 +261,42 @@ const App: React.FC = () => {
   };
 
   const registerParticipant = async (contestId: string, payout: string, type: PayoutType) => {
-    // Выбираем 1-3 случайных бота из фиксированного пула для создания массовки
-    const botCount = Math.floor(Math.random() * 3) + 1;
+    // Выбираем случайных ботов из расширенного пула
+    const botCount = Math.floor(Math.random() * 8) + 5;
     const selectedBots = [];
     const tempPool = [...BOTS_POOL];
+    const updatedProfiles = { ...globalProfiles };
+
     for(let i=0; i<botCount; i++) {
       const idx = Math.floor(Math.random() * tempPool.length);
-      selectedBots.push(tempPool[idx]);
+      const bot = tempPool[idx];
+      selectedBots.push(bot);
+      
+      // Обновляем кол-во участий бота в глобальной базе
+      const botKey = `bot_${bot.name}`;
+      const currentStats = updatedProfiles[botKey] || { participationCount: 0, totalWon: 0, registeredAt: bot.registeredAt, depositAmount: bot.depositAmount };
+      updatedProfiles[botKey] = {
+        ...currentStats,
+        participationCount: (currentStats.participationCount || 0) + 1,
+        name: bot.name
+      };
+
       tempPool.splice(idx, 1);
     }
+
+    // Сохраняем статистику ботов
+    setGlobalProfiles(updatedProfiles);
+    fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
+      method: 'POST', 
+      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
+      body: JSON.stringify(updatedProfiles) 
+    });
 
     const key = `participants_${contestId}`;
     const res = await fetch(`${KV_REST_API_URL}/get/${key}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
     const data = await res.json();
     const existing = data.result ? JSON.parse(data.result) : [];
     
-    // Добавляем реального пользователя и выбранных фиксированных ботов
     const updated = [
       ...existing, 
       { 
@@ -238,7 +315,21 @@ const App: React.FC = () => {
 
     const contestsUpdated = contests.map(c => c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + 1 + botCount } : c);
     saveContestsGlobal(contestsUpdated);
-    saveProfile({ ...profile, participationCount: (profile.participationCount || 0) + 1 });
+    
+    const newParticipationCount = (profile.participationCount || 0) + 1;
+    saveProfile({ ...profile, participationCount: newParticipationCount });
+  };
+
+  const showPublicProfile = (name: string, isBot: boolean, id?: string) => {
+    const key = isBot ? `bot_${name}` : (id || '');
+    const stats = globalProfiles[key];
+    if (stats) {
+      setViewedProfile({ name, ...stats, isBot });
+    } else {
+      // Если статов нет, показываем дефолт
+      setViewedProfile({ name, participationCount: 1, totalWon: 0, isBot });
+    }
+    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -251,6 +342,38 @@ const App: React.FC = () => {
   return (
     <div className="h-screen bg-[#f8f9fc] dark:bg-[#0c0d10] text-[#1a1c1e] dark:text-[#e2e2e6] overflow-hidden flex flex-col font-sans select-none">
       
+      {/* Публичный профиль (Modal) */}
+      {viewedProfile && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
+          <div className="bg-white dark:bg-[#1a1c1e] w-full max-w-xs rounded-[2.5rem] p-8 space-y-6 shadow-2xl relative animate-slide-up">
+            <button onClick={() => setViewedProfile(null)} className="absolute top-6 right-6 p-2 bg-slate-100 dark:bg-slate-800 rounded-full active:scale-90"><XMarkIcon className="w-5 h-5"/></button>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 bg-blue-600/10 rounded-[2rem] flex items-center justify-center text-blue-600"><UserCircleIcon className="w-12 h-12"/></div>
+              <div className="text-center">
+                <h3 className="text-xl font-black">{viewedProfile.name}</h3>
+                <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest">{viewedProfile.isBot ? "Участник" : "Пользователь"}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-center">
+                <p className="text-[8px] font-black uppercase opacity-30 mb-1">Участий</p>
+                <p className="text-xl font-black">{viewedProfile.participationCount || 0}</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 text-center">
+                <p className="text-[8px] font-black uppercase opacity-30 mb-1">Выиграно</p>
+                <p className="text-xl font-black text-green-600">{(viewedProfile.totalWon || 0).toLocaleString()} ₽</p>
+              </div>
+            </div>
+            {viewedProfile.registeredAt && (
+               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] font-bold opacity-40 uppercase tracking-tight">
+                  <span>Регистрация:</span>
+                  <span>{viewedProfile.registeredAt}</span>
+               </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* View Switcher for Admin */}
       {isAdmin && !isRolling && (
         <div className="fixed top-4 right-4 z-[60]">
@@ -307,7 +430,7 @@ const App: React.FC = () => {
                       {adminSelectedContest.winners.map((w, i) => (
                         <div key={i} className="p-5 bg-green-500/5 dark:bg-green-500/10 border border-green-500/10 rounded-3xl space-y-3">
                           <div className="flex justify-between items-start gap-2">
-                            <p className="font-bold text-lg leading-none pt-1">{w.name}</p>
+                            <p className="font-bold text-lg leading-none pt-1" onClick={() => showPublicProfile(w.name, true)}>{w.name}</p>
                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                <span className="text-[8px] font-black bg-blue-500 text-white px-2 py-0.5 rounded uppercase">{w.depositAmount.toLocaleString()} ₽ DEP</span>
                                <span className="text-[8px] font-black bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded uppercase">{w.registeredAt}</span>
@@ -328,7 +451,7 @@ const App: React.FC = () => {
                     <h3 className="text-xs font-black uppercase opacity-30 flex items-center gap-2 px-1"><UsersIcon className="w-4 h-4"/> Участники ({realParticipants.length})</h3>
                     <div className="grid grid-cols-1 gap-2 pb-6">
                       {realParticipants.length > 0 ? realParticipants.map((p, i) => (
-                        <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex justify-between items-center">
+                        <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex justify-between items-center" onClick={() => showPublicProfile(p.name, p.isBot, p.id?.toString())}>
                            <span className="text-sm font-medium truncate pr-4">{p.name}</span>
                            <span className="text-[10px] font-mono opacity-30 flex-shrink-0">**** {p.payout ? p.payout.slice(-4) : '****'}</span>
                         </div>
@@ -576,7 +699,7 @@ const App: React.FC = () => {
                         <h2 className="text-3xl font-black uppercase tracking-tighter">Итоги розыгрыша</h2>
                         <div className="space-y-3">
                            {selectedContest.winners?.map((w, i) => (
-                             <div key={i} className="p-5 bg-slate-50 dark:bg-slate-900 rounded-[2rem] border text-left flex items-center justify-between shadow-sm">
+                             <div key={i} className="p-5 bg-slate-50 dark:bg-slate-900 rounded-[2rem] border text-left flex items-center justify-between shadow-sm cursor-pointer active:scale-[0.98] transition-all" onClick={() => showPublicProfile(w.name, true)}>
                                <div className="overflow-hidden mr-4">
                                  <p className="font-black text-blue-600 text-lg truncate leading-none mb-1">{w.name}</p>
                                  <p className="text-[9px] opacity-40 uppercase font-black tracking-tight leading-tight">Рега: {w.registeredAt} • Деп: {w.depositAmount.toLocaleString()} ₽</p>
