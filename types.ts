@@ -32,6 +32,7 @@ export interface Contest {
   prizeRub: number;
   prizeUsd: number;
   createdAt: number;
+  expiresAt?: number | null; // null = вручную
   participantCount: number;
   isCompleted?: boolean;
   winners?: WinnerInfo[];

