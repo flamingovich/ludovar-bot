@@ -69,6 +69,7 @@ const App: React.FC = () => {
   const [newPrizeRub, setNewPrizeRub] = useState<string>('');
   const [newWinnerCount, setNewWinnerCount] = useState<number>(1);
   const [adminSelectedContest, setAdminSelectedContest] = useState<Contest | null>(null);
+  const [adminParticipants, setAdminParticipants] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const [isChecking, setIsChecking] = useState(false);
@@ -123,6 +124,14 @@ const App: React.FC = () => {
           totalWon: p.totalWon || 0
         })));
       }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchParticipantsForAdmin = async (contestId: string) => {
+    try {
+      const res = await fetch(`${KV_REST_API_URL}/get/participants_${contestId}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const data = await res.json();
+      setAdminParticipants(data.result ? JSON.parse(data.result) : []);
     } catch (e) { console.error(e); }
   };
 
@@ -274,14 +283,12 @@ const App: React.FC = () => {
   return (
     <div className="h-screen bg-matte-black text-[#E2E2E6] overflow-hidden flex flex-col select-none relative font-sans">
       
-      {/* Тонкий профессиональный фон */}
       <div className="absolute inset-0 pointer-events-none z-0">
          <div className="absolute top-0 left-0 w-full h-full opacity-10" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23C5A059' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
          <div className="absolute top-[20%] left-[-10%] w-[50%] h-[40%] bg-gold/5 blur-[80px] rounded-full"></div>
          <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-gold/5 blur-[80px] rounded-full"></div>
       </div>
 
-      {/* Кнопка админа */}
       {isAdmin && !isPickingWinner && (
         <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="fixed top-5 right-5 z-[60] p-3 bg-soft-gray border border-gold/20 rounded-xl shadow-md active:scale-95 transition-all">
           {view === 'admin' ? <ChevronLeftIcon className="w-5 h-5 text-gold"/> : <ShieldCheckIcon className="w-5 h-5 text-gold"/>}
@@ -291,7 +298,7 @@ const App: React.FC = () => {
       {view === 'admin' ? (
         <div className="flex-1 overflow-y-auto p-6 space-y-6 z-10 pt-16">
           <div className="bg-soft-gray p-6 rounded-2xl border border-border-gray space-y-4">
-            <h2 className="text-gold font-bold uppercase tracking-widest text-[10px]">Управление Drops</h2>
+            <h2 className="text-gold font-bold uppercase tracking-widest text-[10px]">Панель Администратора</h2>
             <input placeholder="Название розыгрыша" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full p-3.5 bg-matte-black rounded-lg border border-border-gray text-sm text-gold outline-none focus:border-gold/30 transition-all" />
             <div className="grid grid-cols-2 gap-4">
               <input type="number" placeholder="Банк (₽)" value={newPrizeRub} onChange={e => setNewPrizeRub(e.target.value)} className="w-full p-3.5 bg-matte-black rounded-lg border border-border-gray text-sm text-gold outline-none" />
@@ -308,23 +315,63 @@ const App: React.FC = () => {
                   <p className="text-[9px] opacity-40 uppercase font-medium">{c.prizeRub.toLocaleString()} ₽ • {c.winnerCount} мест</p>
                 </div>
                 <div className="flex gap-2 ml-4">
+                  <button onClick={() => { setAdminSelectedContest(c); fetchParticipantsForAdmin(c.id); }} className="p-2 bg-matte-black border border-border-gray rounded-lg text-gold/60"><UsersIcon className="w-4 h-4"/></button>
                   <button onClick={() => saveContestsGlobal(contests.filter(i => i.id !== c.id))} className="p-2 bg-matte-black border border-border-gray rounded-lg text-red-500/50"><TrashIcon className="w-4 h-4"/></button>
                   {!c.isCompleted && <button onClick={() => drawWinners(c.id)} className="p-2 bg-matte-black border border-gold/30 rounded-lg text-green-500"><TrophyIcon className="w-4 h-4"/></button>}
                 </div>
               </div>
             ))}
           </div>
+
+          {adminSelectedContest && (
+            <div className="fixed inset-0 z-[100] bg-matte-black/95 flex items-center justify-center p-6 backdrop-blur-md">
+              <div className="bg-soft-gray w-full max-w-[400px] rounded-3xl p-6 border border-gold/20 flex flex-col max-h-[85vh]">
+                <div className="flex justify-between items-center mb-6">
+                   <h2 className="text-sm font-bold uppercase text-gold">Участники и Победители</h2>
+                   <button onClick={() => { setAdminSelectedContest(null); setAdminParticipants([]); }} className="text-gold p-1"><XMarkIcon className="w-5 h-5"/></button>
+                </div>
+                <div className="overflow-y-auto space-y-3 no-scrollbar">
+                  {adminSelectedContest.isCompleted ? (
+                    adminSelectedContest.winners?.map((w, i) => (
+                      <div key={i} className="p-4 bg-matte-black border border-gold/20 rounded-xl">
+                        <div className="flex justify-between items-center">
+                          <p className="font-bold text-xs uppercase text-gold">{w.name} (Win)</p>
+                          <p className="text-green-500 font-bold text-xs">+{w.prizeWon.toLocaleString()} ₽</p>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-[10px] opacity-50">
+                          <span className="font-mono">{w.payoutValue}</span>
+                          <button onClick={() => copyToClipboard(w.payoutValue, `admin-w-${i}`)} className="text-gold">
+                             {copiedId === `admin-w-${i}` ? <ClipboardDocumentCheckIcon className="w-4 h-4"/> : <ClipboardIcon className="w-4 h-4"/>}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    adminParticipants.map((p, i) => (
+                      <div key={i} className="p-4 bg-matte-black border border-border-gray rounded-xl flex justify-between items-center">
+                        <p className="font-bold text-xs uppercase text-white">{p.name}</p>
+                        <p className="text-[10px] opacity-40 font-mono">{p.payout}</p>
+                      </div>
+                    ))
+                  )}
+                  {(!adminSelectedContest.isCompleted && adminParticipants.length === 0) && (
+                    <p className="text-center py-10 opacity-30 text-xs uppercase font-bold">Участников пока нет</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden z-10">
           
           <div className="px-8 pt-8 pb-4 flex items-baseline justify-between">
-            <div className="flex items-baseline gap-2">
-              <h1 className="text-2xl font-extrabold text-white tracking-tighter uppercase italic">LUDOVAR</h1>
-              <span className="text-[8px] font-bold text-gold opacity-50 tracking-widest uppercase">Member Edition</span>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-extrabold text-white tracking-tight uppercase">Розыгрыши от Лудовара</h1>
+              <span className="text-[8px] font-bold text-gold opacity-50 tracking-widest uppercase mt-0.5 italic">Premium Membership Access</span>
             </div>
-            <div className="w-8 h-8 rounded-full border border-gold/20 flex items-center justify-center bg-soft-gray">
-              <ShieldCheckIcon className="w-4 h-4 text-gold"/>
+            <div className="w-9 h-9 rounded-full border border-gold/20 flex items-center justify-center bg-soft-gray shadow-lg">
+              <ShieldCheckIcon className="w-5 h-5 text-gold"/>
             </div>
           </div>
 
@@ -338,6 +385,7 @@ const App: React.FC = () => {
                 ) : contests.map(c => {
                   const joined = participatedIds.includes(c.id);
                   const perPerson = Math.floor(c.prizeRub / c.winnerCount);
+                  const totalUsd = (c.prizeRub * usdRate).toFixed(1);
                   return (
                     <div key={c.id} onClick={() => handleStartContest(c)} className="relative bg-soft-gray border border-border-gray p-6 rounded-2xl shadow-lg active:scale-[0.99] transition-all group overflow-hidden">
                       {c.isCompleted ? (
@@ -346,16 +394,22 @@ const App: React.FC = () => {
                         <div className="absolute top-4 right-6 px-2.5 py-0.5 bg-gold/10 rounded border border-gold/30 text-[7px] font-bold uppercase text-gold">Участвую</div>
                       ) : null}
                       
-                      <h3 className="text-base font-bold text-white mb-6 uppercase tracking-tight">{c.title}</h3>
+                      <h3 className="text-base font-bold text-white mb-6 uppercase tracking-tight pr-16 leading-tight">{c.title}</h3>
                       
                       <div className="grid grid-cols-2 gap-4 border-t border-border-gray pt-5">
                         <div className="space-y-1">
-                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Банк</p>
-                          <p className="text-lg font-bold text-gold">{c.prizeRub.toLocaleString()} <span className="text-[10px]">₽</span></p>
+                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Общий Банк</p>
+                          <div className="flex items-baseline gap-1.5">
+                            <p className="text-lg font-bold text-gold">{c.prizeRub.toLocaleString()} ₽</p>
+                            <span className="text-[9px] opacity-25 font-bold">${totalUsd}</span>
+                          </div>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Доля победителя</p>
-                          <p className="text-lg font-bold text-white">{perPerson.toLocaleString()} <span className="text-[10px] opacity-40">₽</span></p>
+                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Призовых мест</p>
+                          <div className="flex items-center gap-2">
+                             <UsersIcon className="w-3.5 h-3.5 text-gold/40"/>
+                             <p className="text-lg font-bold text-white">{c.winnerCount}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -397,7 +451,7 @@ const App: React.FC = () => {
 
             {activeTab === 'profile' && (
               <div className="py-4 space-y-6 animate-slide-up">
-                <div className="flex items-center gap-5 p-6 bg-soft-gray rounded-2xl border border-border-gray">
+                <div className="flex items-center gap-5 p-6 bg-soft-gray rounded-2xl border border-border-gray shadow-lg">
                    <div className="w-14 h-14 bg-matte-black rounded-xl flex items-center justify-center border border-border-gray">
                       <UserCircleIcon className="w-8 h-8 text-gold"/>
                    </div>
@@ -408,17 +462,17 @@ const App: React.FC = () => {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray text-center">
+                  <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray text-center shadow-inner">
                     <p className="text-[8px] font-bold uppercase text-white/30 mb-1 tracking-widest">Участия</p>
                     <p className="text-xl font-bold text-white">{profile.participationCount || 0}</p>
                   </div>
-                  <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray text-center">
+                  <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray text-center shadow-inner">
                     <p className="text-[8px] font-bold uppercase text-white/30 mb-1 tracking-widest">Доход</p>
-                    <p className="text-xl font-bold text-gold">{profile.totalWon || 0}</p>
+                    <p className="text-xl font-bold text-gold">{profile.totalWon || 0} ₽</p>
                   </div>
                 </div>
 
-                <div className="bg-soft-gray p-6 rounded-2xl border border-border-gray space-y-5">
+                <div className="bg-soft-gray p-6 rounded-2xl border border-border-gray space-y-5 shadow-lg">
                    <div className="space-y-2">
                       <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest ml-1">Статус верификации</p>
                       <button onClick={() => { setIsChecking(true); setTimeout(() => { setIsChecking(false); saveProfile({...profile, isReferralVerified: true}); }, 1500); }} disabled={profile.isReferralVerified || isChecking} className={`w-full py-3.5 rounded-lg text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${profile.isReferralVerified ? 'bg-matte-black border border-green-500/20 text-green-500' : 'bg-gold text-matte-black active:scale-95'}`}>
@@ -447,7 +501,7 @@ const App: React.FC = () => {
           <nav className="fixed bottom-0 left-0 right-0 bg-matte-black/95 backdrop-blur-xl border-t border-border-gray p-4 pb-8 flex justify-around z-40">
             <button onClick={() => setActiveTab('contests')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'contests' ? 'text-gold' : 'opacity-30'}`}>
               <GiftIcon className="w-5 h-5"/>
-              <span className="text-[8px] font-bold uppercase tracking-widest">Розыгрыши</span>
+              <span className="text-[8px] font-bold uppercase tracking-widest">Drops</span>
             </button>
             <button onClick={() => setActiveTab('rating')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'rating' ? 'text-gold' : 'opacity-30'}`}>
               <ChartBarIcon className="w-5 h-5"/>
@@ -461,7 +515,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Модальные окна с фиксом верстки */}
       {step !== ContestStep.LIST && (
          <div className="fixed inset-0 z-[110] bg-matte-black flex flex-col p-8 animate-slide-up">
             <button onClick={() => setStep(ContestStep.LIST)} className="absolute top-6 left-6 p-2.5 bg-soft-gray border border-border-gray rounded-xl text-gold active:scale-90 z-20"><ChevronLeftIcon className="w-5 h-5"/></button>
@@ -471,7 +524,7 @@ const App: React.FC = () => {
                   <div className="flex flex-col items-center w-full max-w-[300px]">
                      <LinkIcon className="w-16 h-16 text-gold/40 mb-6 flex-shrink-0"/>
                      <h1 className="text-xl font-bold uppercase tracking-tight mb-2">Требуется доступ</h1>
-                     <p className="text-[10px] opacity-40 uppercase tracking-widest leading-loose mb-10">Верифицируйте аккаунт в Beef для участия в тираже на {selectedContest?.prizeRub.toLocaleString()} ₽</p>
+                     <p className="text-[10px] opacity-40 uppercase tracking-widest leading-loose mb-10 px-4">Верифицируйте аккаунт в Beef для участия в тираже на {selectedContest?.prizeRub.toLocaleString()} ₽</p>
                      <a href={BEEF_LINK} target="_blank" className="w-full py-4 bg-gold text-matte-black rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-all">Открыть Beef</a>
                   </div>
                )}
@@ -490,8 +543,8 @@ const App: React.FC = () => {
                     <FlagIcon className="w-16 h-16 text-gold mb-6 flex-shrink-0"/>
                     <h1 className="text-xl font-bold uppercase tracking-tight mb-6">Подтверждение</h1>
                     <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray w-full mb-8">
-                       <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mb-3">Карта зачисления:</p>
-                       <p className="font-mono text-base font-bold text-gold">{profile.payoutValue}</p>
+                       <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mb-3 text-center">Карта зачисления:</p>
+                       <p className="font-mono text-base font-bold text-gold text-center">{profile.payoutValue}</p>
                     </div>
                     <button onClick={() => { setIsFinalizing(true); setTimeout(() => { registerParticipant(selectedContest!.id, profile.payoutValue); setIsFinalizing(false); setParticipatedIds([...participatedIds, selectedContest!.id]); localStorage.setItem(PARTICIPATION_KEY, JSON.stringify([...participatedIds, selectedContest!.id])); setStep(ContestStep.SUCCESS); }, 1500); }} className="w-full py-4 bg-gold text-matte-black rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all flex items-center justify-center gap-3">
                        {isFinalizing ? <ClockIcon className="w-5 h-5 animate-spin"/> : "Участвовать"}
@@ -502,25 +555,23 @@ const App: React.FC = () => {
                   <div className="flex flex-col items-center w-full max-w-[300px]">
                     {selectedContest?.isCompleted ? (
                       <div className="w-full space-y-6">
-                        <TrophyIcon className="w-14 h-14 text-gold mx-auto mb-2 flex-shrink-0"/>
+                        <TrophyIcon className="w-12 h-12 text-gold mx-auto flex-shrink-0"/>
                         <h2 className="text-xl font-bold uppercase tracking-tight">Итоги тиража</h2>
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+                        <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1 no-scrollbar w-full">
                            {selectedContest.winners?.map((w, i) => (
                              <div key={i} className="p-4 bg-soft-gray border border-border-gray rounded-xl flex items-center justify-between">
-                               <div>
-                                 <p className="font-bold text-white uppercase text-[10px]">{w.name}</p>
+                               <div className="text-left overflow-hidden">
+                                 <p className="font-bold text-white uppercase text-[10px] truncate pr-2">{w.name}</p>
                                  <p className="text-green-500 font-bold text-xs">+{w.prizeWon.toLocaleString()} ₽</p>
                                </div>
-                               <button onClick={() => copyToClipboard(w.payoutValue, `w-${i}`)} className="text-gold/30">
-                                  {copiedId === `w-${i}` ? <ClipboardDocumentCheckIcon className="w-5 h-5"/> : <ClipboardIcon className="w-5 h-5"/>}
-                               </button>
+                               {/* Удалена кнопка копирования чужих реквизитов */}
                              </div>
                            ))}
                         </div>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center">
-                        <div className="w-24 h-24 bg-gold/10 text-gold rounded-full flex items-center justify-center border border-gold/20 mb-8 flex-shrink-0"><CheckBadgeIcon className="w-12 h-12"/></div>
+                        <div className="w-20 h-20 bg-gold/10 text-gold rounded-full flex items-center justify-center border border-gold/20 mb-8 flex-shrink-0"><CheckBadgeIcon className="w-10 h-10"/></div>
                         <h2 className="text-xl font-bold uppercase tracking-tight mb-3">Заявка принята</h2>
                         <p className="text-[9px] opacity-40 font-bold uppercase tracking-widest leading-relaxed max-w-[220px]">Участие зафиксировано в системе.<br/>Ожидайте результатов в списке тиражей.</p>
                       </div>
@@ -535,10 +586,8 @@ const App: React.FC = () => {
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes loading-progress { 0% { width: 0%; } 100% { width: 100%; } }
         .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
         .animate-slide-up { animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .animate-loading-progress { animation: loading-progress 4s linear forwards; }
       `}</style>
     </div>
   );
