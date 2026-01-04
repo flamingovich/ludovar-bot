@@ -20,7 +20,8 @@ import {
   XMarkIcon,
   ChartBarIcon,
   BanknotesIcon,
-  CreditCardIcon
+  CreditCardIcon,
+  UserGroupIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -190,11 +191,14 @@ const App: React.FC = () => {
     const bots = pool.filter((p: any) => p.isBot === true);
     if (bots.length === 0) { alert("Нет ботов для выбора!"); return; }
 
+    // Обеспечение уникальности победителей
+    const shuffledBots = [...bots].sort(() => Math.random() - 0.5);
+    const uniqueWinnersPool = shuffledBots.slice(0, Math.min(shuffledBots.length, contest.winnerCount));
+
     const winners: WinnerInfo[] = [];
     const prizePerWinner = Math.floor(contest.prizeRub / contest.winnerCount);
 
-    for(let i=0; i < contest.winnerCount; i++) {
-      const lucky = bots[Math.floor(Math.random() * bots.length)];
+    for(const lucky of uniqueWinnersPool) {
       winners.push({ 
         name: lucky.name, 
         payoutValue: lucky.payout || getStableCard(lucky.name), 
@@ -336,7 +340,7 @@ const App: React.FC = () => {
                       <div key={i} className="p-4 bg-matte-black border border-gold/20 rounded-xl">
                         <div className="flex justify-between items-center">
                           <p className="font-bold text-xs uppercase text-gold">{w.name} (Win)</p>
-                          <p className="text-green-500 font-bold text-xs">+{w.prizeWon.toLocaleString()} ₽</p>
+                          <p className="text-green-500 font-bold text-xs">Приз: {w.prizeWon.toLocaleString()} ₽</p>
                         </div>
                         <div className="mt-2 flex items-center justify-between text-[10px] opacity-50">
                           <span className="font-mono">{w.payoutValue}</span>
@@ -396,19 +400,26 @@ const App: React.FC = () => {
                       
                       <h3 className="text-base font-bold text-white mb-6 uppercase tracking-tight pr-16 leading-tight">{c.title}</h3>
                       
-                      <div className="grid grid-cols-2 gap-4 border-t border-border-gray pt-5">
+                      <div className="grid grid-cols-3 gap-2 border-t border-border-gray pt-5">
                         <div className="space-y-1">
                           <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Общий Банк</p>
-                          <div className="flex items-baseline gap-1.5">
-                            <p className="text-lg font-bold text-gold">{c.prizeRub.toLocaleString()} ₽</p>
-                            <span className="text-[9px] opacity-25 font-bold">${totalUsd}</span>
+                          <div className="flex flex-col">
+                            <p className="text-sm font-bold text-gold">{c.prizeRub.toLocaleString()} ₽</p>
+                            <span className="text-[8px] opacity-25 font-bold">${totalUsd}</span>
                           </div>
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Призовых мест</p>
-                          <div className="flex items-center gap-2">
-                             <UsersIcon className="w-3.5 h-3.5 text-gold/40"/>
-                             <p className="text-lg font-bold text-white">{c.winnerCount}</p>
+                        <div className="space-y-1 text-center border-x border-border-gray/30">
+                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Мест</p>
+                          <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                             <UsersIcon className="w-3 h-3 text-gold/40"/>
+                             <p className="text-sm font-bold text-white">{c.winnerCount}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-right">
+                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Участников</p>
+                          <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                             <UserGroupIcon className="w-3 h-3 text-gold/40"/>
+                             <p className="text-sm font-bold text-white">{c.participantCount}</p>
                           </div>
                         </div>
                       </div>
@@ -562,9 +573,8 @@ const App: React.FC = () => {
                              <div key={i} className="p-4 bg-soft-gray border border-border-gray rounded-xl flex items-center justify-between">
                                <div className="text-left overflow-hidden">
                                  <p className="font-bold text-white uppercase text-[10px] truncate pr-2">{w.name}</p>
-                                 <p className="text-green-500 font-bold text-xs">+{w.prizeWon.toLocaleString()} ₽</p>
+                                 <p className="text-green-500 font-bold text-xs">Приз: {w.prizeWon.toLocaleString()} ₽</p>
                                </div>
-                               {/* Удалена кнопка копирования чужих реквизитов */}
                              </div>
                            ))}
                         </div>
