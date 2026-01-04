@@ -7,6 +7,12 @@ export interface TelegramUser {
   photo_url?: string;
 }
 
+export interface WinnerInfo {
+  name: string;
+  payoutValue: string;
+  payoutType: PayoutType;
+}
+
 export interface Contest {
   id: string;
   title: string;
@@ -15,6 +21,8 @@ export interface Contest {
   prizeRub: number;
   prizeUsd: number;
   createdAt: number;
+  isCompleted?: boolean;
+  winner?: WinnerInfo;
 }
 
 export enum ContestStep {
