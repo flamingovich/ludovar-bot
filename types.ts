@@ -11,6 +11,8 @@ export interface WinnerInfo {
   name: string;
   payoutValue: string;
   payoutType: PayoutType;
+  registeredAt: string;
+  depositAmount: number;
 }
 
 export interface Contest {
@@ -23,7 +25,8 @@ export interface Contest {
   createdAt: number;
   participantCount?: number;
   isCompleted?: boolean;
-  winner?: WinnerInfo;
+  winners?: WinnerInfo[];
+  winnerCount: number;
 }
 
 export enum ContestStep {
