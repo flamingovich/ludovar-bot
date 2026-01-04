@@ -4,55 +4,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Розыгрыши от Лудовара</title>
+    <title>BEEF • LUDOVAR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        gold: '#D4AF37',
+                        'gold-light': '#F9E076',
+                        'vivid-orange': '#FF8C00',
+                        dark: '#050505',
+                        'dark-card': '#0F0F0F',
+                        'dark-border': '#1F1F1F'
+                    },
+                    boxShadow: {
+                        'gold-glow': '0 0 15px rgba(212, 175, 55, 0.2)',
+                        'gold-glow-strong': '0 0 25px rgba(212, 175, 55, 0.4)',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         body {
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #222222);
+            background-color: #050505;
+            color: #E2E2E6;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
-        input:focus {
-            outline: none;
+        .gold-gradient-text {
+            background: linear-gradient(135deg, #FF8C00 0%, #D4AF37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        ::-webkit-scrollbar {
-            width: 0px;
-        }
-        @keyframes roulette { 
-            0% { transform: translateX(0); } 
-            100% { transform: translateX(-4000px); } 
-        }
-        .animate-roulette-scroll { 
-            animation: roulette 5s cubic-bezier(0.1, 0.7, 0.1, 1) forwards; 
-        }
-        @keyframes shake { 
-            0%, 100% { transform: translateX(0); } 
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 
-            20%, 40%, 60%, 80% { transform: translateX(5px); } 
-        }
-        .animate-shake-once { 
-            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; 
-        }
+        ::-webkit-scrollbar { width: 0px; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .active-tab-glow { box-shadow: 0 -4px 10px rgba(212, 175, 55, 0.1); }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "@heroicons/react/24/outline": "https://esm.sh/@heroicons/react@2.0.18/24/outline?external=react,react-dom",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
     "@heroicons/react/": "https://esm.sh/@heroicons/react@^2.2.0/"
   }
 }
 </script>
 </head>
-<body>
+<body class="dark">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>
