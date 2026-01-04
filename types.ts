@@ -12,6 +12,8 @@ export interface Contest {
   title: string;
   description: string;
   referralLink: string;
+  prizeRub: number;
+  prizeUsd: number;
   createdAt: number;
 }
 
