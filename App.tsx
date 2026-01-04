@@ -22,10 +22,11 @@ import {
   StarIcon,
   FlagIcon,
   ArrowTopRightOnSquareIcon,
-  XMarkIcon
+  XMarkIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 
-const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
+const KV_REST_API_URL = 'https://golden-hound-18396.io'; 
 const KV_REST_API_TOKEN = 'AUfcAAIncDJiMzQwNjMwYzUzOGM0NDI4YjQyNWQ3NjAzZDYwNDk2ZHAyMTgzOTY'; 
 
 const DB_KEY = 'beef_contests_v6_final';
@@ -63,7 +64,7 @@ const getStableCard = (name: string) => {
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'contests' | 'profile'>('contests');
+  const [activeTab, setActiveTab] = useState<'contests' | 'rating' | 'profile'>('contests');
   const [view, setView] = useState<'user' | 'admin'>('user');
   const [step, setStep] = useState<ContestStep>(ContestStep.LIST);
   const [user, setUser] = useState<TelegramUser | null>(null);
@@ -121,7 +122,6 @@ const App: React.FC = () => {
         const rawProfiles = JSON.parse(data.result);
         setGlobalProfiles(rawProfiles);
         
-        // Мапим профили в пул ботов (фильтруем тех, у кого нет Telegram ID, т.е. ботов из списка)
         const mappedBots: BotParticipant[] = rawProfiles.map((p: any) => ({
           id: p.name,
           name: p.name,
@@ -136,6 +136,12 @@ const App: React.FC = () => {
       }
     } catch (e) { console.error(e); }
   };
+
+  const topRating = useMemo(() => {
+    return [...globalProfiles]
+      .sort((a, b) => (b.totalWon || 0) - (a.totalWon || 0))
+      .slice(0, 10);
+  }, [globalProfiles]);
 
   const saveGlobalProfilesUpdate = async (updated: any[]) => {
     setGlobalProfiles(updated);
@@ -218,11 +224,18 @@ const App: React.FC = () => {
     const partData = await partRes.json();
     const pool = partData.result ? JSON.parse(partData.result) : [];
     
+    // ВАЖНО: Выигрывают ТОЛЬКО боты
+    const onlyBotsPool = pool.filter((p: any) => p.isBot === true);
+    
+    if (onlyBotsPool.length === 0) {
+      alert("В розыгрыше нет ботов!");
+      return;
+    }
+
     const winners: WinnerInfo[] = [];
     const prizePerWinner = Math.floor(contest.prizeRub / contest.winnerCount);
 
-    // Выбираем победителей из общего пула участников конкурса
-    const tempPool = [...pool];
+    const tempPool = [...onlyBotsPool];
     for(let i=0; i < Math.min(contest.winnerCount, tempPool.length); i++) {
       const luckyIndex = Math.floor(Math.random() * tempPool.length);
       const lucky = tempPool[luckyIndex];
@@ -250,7 +263,6 @@ const App: React.FC = () => {
     setTimeout(async () => {
       clearInterval(interval);
       
-      // Обновляем массив глобальных профилей (totalWon для ботов)
       const profilesRes = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const profilesData = await profilesRes.json();
       const currentProfiles = profilesData.result ? JSON.parse(profilesData.result) : [...globalProfiles];
@@ -271,11 +283,11 @@ const App: React.FC = () => {
       setIsPickingWinner(false);
       setAdminSelectedContest(updatedContests.find(c => c.id === contestId)!);
       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('heavy');
+      fetchBotsAndProfiles(); // Обновить рейтинг после выигрыша
     }, 5000);
   };
 
   const registerParticipant = async (contestId: string, payout: string, type: PayoutType) => {
-    // 1. Выбираем ботов (1-3) из актуального botsPool
     const botCount = Math.floor(Math.random() * 3) + 1; 
     let selectedBots: any[] = [];
     const tempPool = [...botsPool];
@@ -288,13 +300,11 @@ const App: React.FC = () => {
     }
 
     try {
-      // 2. Получаем участников конкурса
       const key = `participants_${contestId}`;
       const partRes = await fetch(`${KV_REST_API_URL}/get/${key}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const partData = await partRes.json();
       const existingParticipants = partData.result ? JSON.parse(partData.result) : [];
       
-      // 3. Добавляем реального юзера
       const newEntry = { 
         id: user?.id, 
         name: user?.first_name || 'User', 
@@ -307,14 +317,12 @@ const App: React.FC = () => {
       
       const updatedParticipants = [...existingParticipants, newEntry, ...selectedBots];
       
-      // 4. Сохраняем участников в БД конкурса
       await fetch(`${KV_REST_API_URL}/set/${key}`, { 
         method: 'POST', 
         headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
         body: JSON.stringify(updatedParticipants) 
       });
 
-      // 5. ОБНОВЛЯЕМ participationCount в GLOBAL_PROFILES_KEY для выбранных ботов
       const profilesRes = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const profilesData = await profilesRes.json();
       const currentProfiles = profilesData.result ? JSON.parse(profilesData.result) : [...globalProfiles];
@@ -328,7 +336,6 @@ const App: React.FC = () => {
 
       await saveGlobalProfilesUpdate(updatedProfiles);
 
-      // 6. Обновляем счетчик участников в списке конкурсов
       const contestsRes = await fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const contestsData = await contestsRes.json();
       const currentContests: Contest[] = contestsData.result ? JSON.parse(contestsData.result) : contests;
@@ -340,35 +347,21 @@ const App: React.FC = () => {
       
       await saveContestsGlobal(contestsUpdated);
       
-      // 7. Локальное обновление
       const newCount = (profile.participationCount || 0) + 1;
       saveProfile({ ...profile, participationCount: newCount });
       
-      fetchContests(); // Обновить UI
-      fetchBotsAndProfiles(); // Обновить локальный пул ботов со свежей статистикой
-      
-      console.log(`Зарегистрировано: +1 юзер и +${selectedBots.length} ботов. Статистика в v3 обновлена.`);
+      fetchContests(); 
+      fetchBotsAndProfiles();
     } catch (err) {
-      console.error("Ошибка регистрации:", err);
-      setError("Ошибка связи с сервером.");
+      console.error(err);
+      setError("Ошибка сервера.");
     }
   };
 
   const showPublicProfile = (name: string, isBot: boolean) => {
-    // Ищем профиль в загруженном массиве глобальных профилей
     const stats = globalProfiles.find(p => p.name === name);
-    if (stats) {
-      setViewedProfile({ ...stats, isBot });
-    } else {
-      setViewedProfile({ name, participationCount: 1, totalWon: 0, isBot });
-    }
-    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
-  };
-
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text.replace(/\s/g, ''));
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    if (stats) setViewedProfile({ ...stats, isBot });
+    else setViewedProfile({ name, participationCount: 1, totalWon: 0, isBot });
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
   };
 
@@ -407,7 +400,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* View Switcher for Admin */}
+      {/* Admin Toggle */}
       {isAdmin && !isPickingWinner && (
         <div className="fixed top-4 right-4 z-[60]">
           <button onClick={() => { setView(view === 'admin' ? 'user' : 'admin'); setError(null); }} className="p-3 bg-blue-600 text-white rounded-2xl shadow-xl active:scale-90 transition-all">
@@ -451,49 +444,20 @@ const App: React.FC = () => {
                 <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4 flex-shrink-0">
                   <div className="min-w-0 pr-4">
                     <h2 className="text-xl font-black truncate">{adminSelectedContest.title}</h2>
-                    <p className="text-[10px] opacity-40 font-bold uppercase tracking-widest">Управление результатами</p>
+                    <p className="text-[10px] opacity-40 font-bold uppercase tracking-widest">Результаты</p>
                   </div>
-                  <button onClick={() => setAdminSelectedContest(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full active:scale-90 transition-all flex-shrink-0"><ChevronLeftIcon className="w-6 h-6 rotate-90"/></button>
+                  <button onClick={() => setAdminSelectedContest(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full active:scale-90 transition-all"><XMarkIcon className="w-6 h-6"/></button>
                 </div>
                 
                 <div className="flex-1 space-y-6 overflow-y-auto pr-1">
-                  {adminSelectedContest.winners && adminSelectedContest.winners.length > 0 && (
-                    <div className="space-y-4">
-                      <h3 className="text-xs font-black uppercase text-green-600 flex items-center gap-2"><TrophyIcon className="w-4 h-4"/> Победители</h3>
-                      {adminSelectedContest.winners.map((w, i) => (
-                        <div key={i} className="p-5 bg-green-500/5 dark:bg-green-500/10 border border-green-500/10 rounded-3xl space-y-3">
-                          <div className="flex justify-between items-start gap-2">
-                            <p className="font-bold text-lg leading-none pt-1" onClick={() => showPublicProfile(w.name, true)}>{w.name}</p>
-                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                               <span className="text-[8px] font-black bg-blue-500 text-white px-2 py-0.5 rounded uppercase">{w.depositAmount.toLocaleString()} ₽ DEP</span>
-                               <span className="text-[8px] font-black bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded uppercase">{w.registeredAt}</span>
-                               <span className="text-[9px] font-black text-green-600 mt-1">+{w.prizeWon.toLocaleString()} ₽</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800/50 rounded-2xl border dark:border-slate-700 shadow-sm">
-                             <p className="font-mono text-xs opacity-50 truncate mr-4">**** **** **** {w.payoutValue.slice(-4)}</p>
-                             <button onClick={() => copyToClipboard(w.payoutValue, `adm-w-${i}`)} className="p-2.5 bg-blue-600 text-white rounded-xl active:scale-90 transition-all">
-                               {copiedId === `adm-w-${i}` ? <ClipboardDocumentCheckIcon className="w-4 h-4"/> : <ClipboardIcon className="w-4 h-4"/>}
-                             </button>
-                          </div>
-                        </div>
-                      ))}
+                  {adminSelectedContest.winners?.map((w, i) => (
+                    <div key={i} className="p-5 bg-green-500/10 border border-green-500/20 rounded-3xl space-y-3">
+                      <p className="font-bold text-lg" onClick={() => showPublicProfile(w.name, true)}>{w.name} (+{w.prizeWon.toLocaleString()} ₽)</p>
+                      <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800/50 rounded-2xl border dark:border-slate-700">
+                         <p className="font-mono text-xs opacity-50">**** {w.payoutValue.slice(-4)}</p>
+                      </div>
                     </div>
-                  )}
-
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-black uppercase opacity-30 flex items-center gap-2 px-1"><UsersIcon className="w-4 h-4"/> Участники ({realParticipants.length})</h3>
-                    <div className="grid grid-cols-1 gap-2 pb-6">
-                      {realParticipants.length > 0 ? realParticipants.map((p, i) => (
-                        <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex justify-between items-center" onClick={() => showPublicProfile(p.name, p.isBot)}>
-                           <span className="text-sm font-medium truncate pr-4">{p.name}</span>
-                           <span className="text-[10px] font-mono opacity-30 flex-shrink-0">**** {p.payout ? p.payout.slice(-4) : '****'}</span>
-                        </div>
-                      )) : (
-                        <p className="text-center text-[10px] font-bold opacity-20 py-10 uppercase tracking-widest">Список участников пуст</p>
-                      )}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -501,16 +465,10 @@ const App: React.FC = () => {
 
           {isPickingWinner && (
             <div className="fixed inset-0 z-[300] bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center p-8 space-y-12">
-               <div className="relative">
-                  <div className="absolute inset-0 bg-blue-500/20 blur-[80px] rounded-full animate-pulse"></div>
-                  <div className="relative bg-white/5 p-10 rounded-[3rem] border border-white/10 shadow-2xl animate-bounce">
-                     <TrophyIcon className="w-24 h-24 text-blue-500"/>
-                  </div>
-               </div>
                <div className="text-center space-y-4 max-w-[280px]">
-                  <h2 className="text-3xl font-black text-white italic tracking-tighter">ВЫБОР ПОБЕДИТЕЛЯ</h2>
+                  <h2 className="text-3xl font-black text-white italic">ВЫБОР ПОБЕДИТЕЛЯ</h2>
                   <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-                     <div className="h-full bg-blue-600 animate-loading-progress rounded-full shadow-[0_0_15px_rgba(37,99,235,0.8)]"></div>
+                     <div className="h-full bg-blue-600 animate-loading-progress rounded-full"></div>
                   </div>
                   <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] animate-pulse">{pickingStatus}</p>
                </div>
@@ -521,30 +479,28 @@ const App: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden relative">
           
           <div className="p-6 pb-2">
-            <h1 className="text-xl font-black tracking-tight text-[#1a1c1e] dark:text-white">Розыгрыши от Лудовара</h1>
+            <h1 className="text-xl font-black tracking-tight text-[#1a1c1e] dark:text-white">
+              {activeTab === 'contests' ? 'Розыгрыши' : activeTab === 'rating' ? 'Рейтинг' : 'Профиль'}
+            </h1>
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 pb-28">
-            {activeTab === 'contests' ? (
+            {activeTab === 'contests' && (
               <div className="space-y-5 py-4 animate-fade-in">
                 {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-24 gap-4">
-                     <ClockIcon className="w-10 h-10 animate-spin text-blue-600 opacity-20"/>
-                     <p className="text-[10px] font-black uppercase tracking-widest opacity-20">Загрузка...</p>
-                  </div>
+                  <div className="flex flex-col items-center justify-center py-24 opacity-20"><ClockIcon className="w-10 h-10 animate-spin"/></div>
                 ) : contests.length === 0 ? (
                   <div className="text-center py-20 opacity-20"><GiftIcon className="w-12 h-12 mx-auto mb-2"/><p>Пока ничего нет</p></div>
                 ) : (
                   contests.map(c => {
                     const joined = participatedIds.includes(c.id);
                     return (
-                      <div key={c.id} onClick={() => handleStartContest(c)} className="relative bg-white dark:bg-slate-900/60 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all overflow-hidden group">
+                      <div key={c.id} onClick={() => handleStartContest(c)} className="relative bg-white dark:bg-slate-900/60 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all overflow-hidden">
                         {c.isCompleted && <div className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-800 text-[9px] font-black uppercase px-4 py-2 rounded-bl-2xl opacity-50">Завершен</div>}
                         {joined && !c.isCompleted && <div className="absolute top-0 right-0 bg-green-500 text-white text-[9px] font-black uppercase px-4 py-2 rounded-bl-2xl">В игре</div>}
                         <h3 className="text-lg font-bold mb-4 pr-12 leading-tight">{c.title}</h3>
                         <div className="flex items-center gap-3">
                           <div className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 font-black text-sm">{c.prizeRub.toLocaleString()} ₽</div>
-                          <span className="text-[10px] font-bold opacity-30">≈ ${Math.round(c.prizeRub * 0.011)}</span>
                           <div className="ml-auto flex items-center gap-1.5 opacity-40">
                              <UsersIcon className="w-3.5 h-3.5"/>
                              <span className="text-[10px] font-black">{c.participantCount}</span>
@@ -555,7 +511,46 @@ const App: React.FC = () => {
                   })
                 )}
               </div>
-            ) : (
+            )}
+
+            {activeTab === 'rating' && (
+              <div className="py-4 space-y-4 animate-fade-in">
+                <div className="bg-blue-600 text-white p-6 rounded-[2.5rem] shadow-xl shadow-blue-600/20 mb-8 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Всего разыграно</p>
+                    <p className="text-3xl font-black">{globalProfiles.reduce((acc, p) => acc + (p.totalWon || 0), 0).toLocaleString()} ₽</p>
+                  </div>
+                  <TrophyIcon className="w-12 h-12 opacity-30"/>
+                </div>
+
+                <div className="space-y-2">
+                  {topRating.map((p, i) => (
+                    <div 
+                      key={p.name} 
+                      onClick={() => showPublicProfile(p.name, true)}
+                      className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 active:scale-[0.98] transition-all shadow-sm"
+                    >
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${
+                        i === 0 ? 'bg-yellow-400 text-white' : 
+                        i === 1 ? 'bg-slate-300 text-white' : 
+                        i === 2 ? 'bg-orange-400 text-white' : 'bg-slate-100 dark:bg-slate-800 opacity-40'
+                      }`}>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <p className="font-bold text-sm truncate">{p.name}</p>
+                        <p className="text-[10px] font-black text-blue-600/50 uppercase">{p.participationCount} участий</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-green-600">{(p.totalWon || 0).toLocaleString()} ₽</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'profile' && (
               <div className="space-y-8 py-6 animate-slide-up">
                 <div className="flex flex-col items-center space-y-4">
                   <div className="w-24 h-24 bg-blue-600 rounded-[2.5rem] flex items-center justify-center text-white shadow-xl shadow-blue-600/20"><UserCircleIcon className="w-16 h-16"/></div>
@@ -601,34 +596,20 @@ const App: React.FC = () => {
                         {isChecking ? <ClockIcon className="w-4 h-4 animate-spin"/> : profile.isReferralVerified ? "ОК" : "Проверить"}
                       </button>
                     </div>
-
-                    {!profile.isReferralVerified && (
-                      <a href={BEEF_LINK} target="_blank" className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-500/20 text-blue-600 active:scale-[0.98] transition-all">
-                         <span className="text-xs font-black uppercase tracking-tight">Зарегистрироваться на Beef</span>
-                         <ArrowTopRightOnSquareIcon className="w-4 h-4"/>
-                      </a>
-                    )}
                   </div>
 
                   <div className="space-y-3">
                     <p className="text-[10px] font-black uppercase opacity-30 tracking-widest px-2">Карта для выплат</p>
-                    <div className="relative">
-                      <input 
-                        placeholder="Номер карты" 
-                        value={profile.payoutValue || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const type = val.startsWith('T') ? 'trc20' : 'card';
-                          saveProfile({ ...profile, payoutValue: type === 'card' ? formatCard(val) : val, payoutType: type });
-                        }}
-                        className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border text-sm font-mono outline-none shadow-inner"
-                      />
-                      {profile.payoutValue && profile.payoutType === 'card' && (
-                        <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black ${getCardType(profile.payoutValue)?.color}`}>
-                          {getCardType(profile.payoutValue)?.label}
-                        </span>
-                      )}
-                    </div>
+                    <input 
+                      placeholder="Номер карты" 
+                      value={profile.payoutValue || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const type = val.startsWith('T') ? 'trc20' : 'card';
+                        saveProfile({ ...profile, payoutValue: type === 'card' ? formatCard(val) : val, payoutType: type });
+                      }}
+                      className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border text-sm font-mono outline-none shadow-inner"
+                    />
                   </div>
                 </div>
               </div>
@@ -643,65 +624,10 @@ const App: React.FC = () => {
               </button>
 
               <div className="flex-1 flex flex-col justify-center items-center text-center space-y-10 py-12">
-                {step === ContestStep.REFERRAL && (
-                  <>
-                    <div className="w-28 h-28 bg-blue-600/5 rounded-full flex items-center justify-center relative shadow-inner">
-                      <LinkIcon className="w-14 h-14 text-blue-600"/>
-                      <div className="absolute bottom-2 right-2 bg-blue-600 p-1.5 rounded-xl border-4 border-white dark:border-[#0c0d10] shadow-xl"><CheckBadgeIcon className="w-4 h-4 text-white"/></div>
-                    </div>
-                    <div className="space-y-4">
-                      <h1 className="text-4xl font-black">{selectedContest?.prizeRub.toLocaleString()} ₽</h1>
-                      <p className="text-sm opacity-50 px-6 font-medium leading-relaxed">Для участия подтвердите аккаунт Beef, зарегистрированный по нашей ссылке</p>
-                    </div>
-                    <div className="w-full max-w-[300px] flex flex-col gap-3">
-                      <a href={selectedContest?.referralLink} target="_blank" className="w-full py-5 bg-blue-600 text-white rounded-[1.8rem] font-bold text-lg shadow-xl shadow-blue-600/20 active:scale-95 transition-all">Регистрация</a>
-                      <button 
-                        onClick={() => {
-                          setError(null);
-                          setIsChecking(true); 
-                          setTimeout(() => {
-                            setIsChecking(false);
-                            if(checkAttempts >= 1) { 
-                              saveProfile({...profile, isReferralVerified: true}); 
-                              handleStartContest(selectedContest!);
-                              setError(null);
-                            }
-                            else { setCheckAttempts(1); setError("Аккаунт не найден. Проверьте регистрацию."); }
-                          }, 1500);
-                        }} 
-                        className="w-full py-4 border-2 rounded-[1.8rem] text-[11px] font-black uppercase flex items-center justify-center gap-2 active:bg-slate-50 transition-all"
-                      >
-                        {isChecking ? <ClockIcon className="w-5 h-5 animate-spin"/> : "Проверить"}
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {step === ContestStep.PAYOUT && (
-                  <div className="w-full max-w-[400px] space-y-8">
-                    <h1 className="text-3xl font-black uppercase tracking-tight">Выплата</h1>
-                    <p className="text-sm opacity-50 px-6 font-medium leading-relaxed">Укажите номер карты для получения выигрыша в случае победы</p>
-                    <div className="relative">
-                      <input 
-                        placeholder="0000 0000 0000 0000" 
-                        value={payoutInput} 
-                        onChange={(e) => { setError(null); setPayoutInput(formatCard(e.target.value)); }}
-                        className="w-full py-6 px-8 bg-slate-50 dark:bg-slate-900 border-2 rounded-[1.8rem] text-xl font-mono focus:border-blue-600 outline-none transition-all shadow-inner" 
-                      />
-                      {payoutInput.length > 0 && <span className={`absolute right-6 top-1/2 -translate-y-1/2 text-xs font-black ${getCardType(payoutInput)?.color}`}>{getCardType(payoutInput)?.label}</span>}
-                    </div>
-                    <button onClick={() => { setError(null); saveProfile({...profile, payoutValue: payoutInput, payoutType: 'card'}); handleStartContest(selectedContest!); }} disabled={payoutInput.length < 16} className="w-full py-5 bg-blue-600 text-white rounded-3xl font-bold text-lg shadow-xl shadow-blue-600/20 disabled:opacity-20 active:scale-95 transition-all">Сохранить</button>
-                  </div>
-                )}
-
                 {step === ContestStep.FINAL && (
                   <>
                     <div className="w-24 h-24 bg-green-500/5 rounded-3xl flex items-center justify-center border-2 border-green-500/10 shadow-lg"><FlagIcon className="w-10 h-10 text-green-500"/></div>
                     <h1 className="text-3xl font-black uppercase tracking-tight">Почти готово!</h1>
-                    <div className="w-full p-6 bg-slate-50 dark:bg-slate-900 border rounded-3xl shadow-sm">
-                       <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Реквизиты для выплаты</p>
-                       <p className="font-mono text-base font-bold break-all">{profile.payoutValue}</p>
-                    </div>
                     <button 
                       onClick={() => { 
                         setError(null);
@@ -727,22 +653,16 @@ const App: React.FC = () => {
                   <div className="space-y-8 w-full max-w-[500px]">
                     {selectedContest?.isCompleted ? (
                       <>
-                        <div className="relative w-32 h-32 flex items-center justify-center mx-auto">
-                           <div className="absolute inset-0 bg-blue-600/10 blur-[60px] animate-pulse rounded-full"></div>
-                           <TrophyIcon className="w-20 h-20 text-blue-600 relative z-10"/>
-                        </div>
+                        <TrophyIcon className="w-20 h-20 text-blue-600 mx-auto"/>
                         <h2 className="text-3xl font-black uppercase tracking-tighter">Итоги розыгрыша</h2>
                         <div className="space-y-3">
                            {selectedContest.winners?.map((w, i) => (
                              <div key={i} className="p-5 bg-slate-50 dark:bg-slate-900 rounded-[2rem] border text-left flex items-center justify-between shadow-sm cursor-pointer active:scale-[0.98] transition-all" onClick={() => showPublicProfile(w.name, true)}>
                                <div className="overflow-hidden mr-4">
                                  <p className="font-black text-blue-600 text-lg truncate leading-none mb-1">{w.name}</p>
-                                 <p className="text-[9px] opacity-40 uppercase font-black tracking-tight leading-tight">Рега: {w.registeredAt} • Деп: {w.depositAmount.toLocaleString()} ₽</p>
                                  <p className="text-[10px] font-black text-green-600 mt-1">ВЫИГРЫШ: +{w.prizeWon.toLocaleString()} ₽</p>
                                </div>
-                               <div className="flex-shrink-0">
-                                  <StarIcon className="w-6 h-6 fill-yellow-500 text-yellow-500"/>
-                               </div>
+                               <StarIcon className="w-6 h-6 fill-yellow-500 text-yellow-500"/>
                              </div>
                            ))}
                         </div>
@@ -751,7 +671,6 @@ const App: React.FC = () => {
                       <>
                         <div className="w-32 h-32 bg-green-500 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-green-500/20 border-8 border-white dark:border-[#0c0d10]"><CheckBadgeIcon className="w-20 h-20 text-white"/></div>
                         <h2 className="text-3xl font-black uppercase tracking-tight">Вы в игре!</h2>
-                        <p className="text-sm opacity-50 px-8 font-medium leading-relaxed">Ваша заявка принята. Ожидайте результатов, которые будут опубликованы здесь и в нашем канале.</p>
                       </>
                     )}
                   </div>
@@ -765,6 +684,10 @@ const App: React.FC = () => {
             <button onClick={() => { setActiveTab('contests'); setStep(ContestStep.LIST); setError(null); }} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'contests' ? 'text-blue-600 scale-110' : 'opacity-30'}`}>
               <GiftIcon className="w-6 h-6"/>
               <span className="text-[9px] font-black uppercase tracking-widest">Конкурсы</span>
+            </button>
+            <button onClick={() => { setActiveTab('rating'); setStep(ContestStep.LIST); setError(null); }} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'rating' ? 'text-blue-600 scale-110' : 'opacity-30'}`}>
+              <ChartBarIcon className="w-6 h-6"/>
+              <span className="text-[9px] font-black uppercase tracking-widest">Рейтинг</span>
             </button>
             <button onClick={() => { setActiveTab('profile'); setStep(ContestStep.LIST); setError(null); }} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'profile' ? 'text-blue-600 scale-110' : 'opacity-30'}`}>
               <UserCircleIcon className="w-6 h-6"/>
