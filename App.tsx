@@ -26,7 +26,7 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 
-const KV_REST_API_URL = 'https://golden-hound-18396.io'; 
+const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
 const KV_REST_API_TOKEN = 'AUfcAAIncDJiMzQwNjMwYzUzOGM0NDI4YjQyNWQ3NjAzZDYwNDk2ZHAyMTgzOTY'; 
 
 const DB_KEY = 'beef_contests_v6_final';
@@ -111,7 +111,11 @@ const App: React.FC = () => {
       const res = await fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const data = await res.json();
       if (data.result) setContests(JSON.parse(data.result));
-    } catch (e) { console.error(e); } finally { setIsLoading(false); }
+      else setContests([]);
+    } catch (e) { 
+      console.error("Contest fetch error:", e);
+      setError("Ошибка загрузки конкурсов");
+    } finally { setIsLoading(false); }
   };
 
   const fetchBotsAndProfiles = async () => {
@@ -120,9 +124,9 @@ const App: React.FC = () => {
       const data = await res.json();
       if (data.result) {
         const rawProfiles = JSON.parse(data.result);
-        setGlobalProfiles(rawProfiles);
+        setGlobalProfiles(Array.isArray(rawProfiles) ? rawProfiles : []);
         
-        const mappedBots: BotParticipant[] = rawProfiles.map((p: any) => ({
+        const mappedBots: BotParticipant[] = (Array.isArray(rawProfiles) ? rawProfiles : []).map((p: any) => ({
           id: p.name,
           name: p.name,
           registeredAt: p.registeredAt || '01.01.2025',
@@ -134,7 +138,7 @@ const App: React.FC = () => {
         }));
         setBotsPool(mappedBots);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Bots fetch error:", e); }
   };
 
   const topRating = useMemo(() => {
@@ -151,7 +155,7 @@ const App: React.FC = () => {
         headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
         body: JSON.stringify(updated) 
       });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Global profiles save error:", e); }
   };
 
   const saveContestsGlobal = async (updated: Contest[]) => {
@@ -162,7 +166,7 @@ const App: React.FC = () => {
         headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
         body: JSON.stringify(updated) 
       }); 
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Contests save error:", e); }
   };
 
   const saveProfile = (updated: UserProfile) => {
@@ -283,7 +287,7 @@ const App: React.FC = () => {
       setIsPickingWinner(false);
       setAdminSelectedContest(updatedContests.find(c => c.id === contestId)!);
       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('heavy');
-      fetchBotsAndProfiles(); // Обновить рейтинг после выигрыша
+      fetchBotsAndProfiles(); 
     }, 5000);
   };
 
@@ -292,11 +296,13 @@ const App: React.FC = () => {
     let selectedBots: any[] = [];
     const tempPool = [...botsPool];
 
-    for(let i=0; i < Math.min(botCount, tempPool.length); i++) {
-      const idx = Math.floor(Math.random() * tempPool.length);
-      const bot = tempPool[idx];
-      selectedBots.push(bot);
-      tempPool.splice(idx, 1);
+    if (tempPool.length > 0) {
+      for(let i=0; i < Math.min(botCount, tempPool.length); i++) {
+        const idx = Math.floor(Math.random() * tempPool.length);
+        const bot = tempPool[idx];
+        selectedBots.push(bot);
+        tempPool.splice(idx, 1);
+      }
     }
 
     try {
@@ -354,7 +360,7 @@ const App: React.FC = () => {
       fetchBotsAndProfiles();
     } catch (err) {
       console.error(err);
-      setError("Ошибка сервера.");
+      setError("Ошибка соединения");
     }
   };
 
@@ -524,7 +530,7 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  {topRating.map((p, i) => (
+                  {topRating.length > 0 ? topRating.map((p, i) => (
                     <div 
                       key={p.name} 
                       onClick={() => showPublicProfile(p.name, true)}
@@ -539,13 +545,15 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex-1 overflow-hidden">
                         <p className="font-bold text-sm truncate">{p.name}</p>
-                        <p className="text-[10px] font-black text-blue-600/50 uppercase">{p.participationCount} участий</p>
+                        <p className="text-[10px] font-black text-blue-600/50 uppercase">{p.participationCount || 0} участий</p>
                       </div>
                       <div className="text-right">
                         <p className="font-black text-green-600">{(p.totalWon || 0).toLocaleString()} ₽</p>
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="text-center py-20 opacity-20 uppercase font-black tracking-widest text-[10px]">Рейтинг пуст</div>
+                  )}
                 </div>
               </div>
             )}
@@ -605,8 +613,7 @@ const App: React.FC = () => {
                       value={profile.payoutValue || ''}
                       onChange={(e) => {
                         const val = e.target.value;
-                        const type = val.startsWith('T') ? 'trc20' : 'card';
-                        saveProfile({ ...profile, payoutValue: type === 'card' ? formatCard(val) : val, payoutType: type });
+                        saveProfile({ ...profile, payoutValue: formatCard(val), payoutType: 'card' });
                       }}
                       className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border text-sm font-mono outline-none shadow-inner"
                     />
