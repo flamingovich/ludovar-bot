@@ -22,7 +22,8 @@ import {
   BanknotesIcon,
   CreditCardIcon,
   UserGroupIcon,
-  CalendarIcon
+  CalendarIcon,
+  ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -34,7 +35,7 @@ const PROFILE_KEY = 'beef_user_profile_final';
 const PARTICIPATION_KEY = 'beef_user_participations_final';
 const GLOBAL_PROFILES_KEY = 'beef_global_profiles_v3'; 
 
-const BEEF_LINK = 'https://v.beef.gg/LUDOVAR';
+const BEEF_LINK = 'https://beef-way-one.com/c22082169';
 
 const DURATION_OPTIONS = [
   { label: '5 минут', value: 5 * 60 * 1000 },
@@ -70,7 +71,9 @@ const Countdown = ({ expiresAt }: { expiresAt: number }) => {
     const timer = setInterval(() => {
       const remaining = expiresAt - Date.now();
       setTimeLeft(remaining);
-      if (remaining <= 0) clearInterval(timer);
+      if (remaining <= 0) {
+        clearInterval(timer);
+      }
     }, 1000);
     return () => clearInterval(timer);
   }, [expiresAt]);
@@ -142,7 +145,15 @@ const App: React.FC = () => {
     try {
       const res = await fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const data = await res.json();
-      if (data.result) setContests(JSON.parse(data.result));
+      if (data.result) {
+        const parsed: Contest[] = JSON.parse(data.result);
+        setContests(parsed);
+        // Автоматическое завершение истекших розыгрышей
+        const expired = parsed.filter(c => !c.isCompleted && c.expiresAt && c.expiresAt < Date.now());
+        if (expired.length > 0) {
+          expired.forEach(c => autoDrawWinners(c.id, parsed));
+        }
+      }
     } catch (e) { console.error("Ошибка сети"); } finally { setIsLoading(false); }
   };
 
@@ -223,6 +234,51 @@ const App: React.FC = () => {
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
   };
 
+  // Внутренняя функция для авто-завершения (без UI алертов)
+  const autoDrawWinners = async (contestId: string, currentContests: Contest[]) => {
+    try {
+      const contest = currentContests.find(c => c.id === contestId);
+      if (!contest || contest.isCompleted) return;
+
+      const res = await fetch(`${KV_REST_API_URL}/get/participants_${contestId}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const data = await res.json();
+      const pool = data.result ? JSON.parse(data.result) : [];
+      const bots = pool.filter((p: any) => p.isBot === true);
+      if (bots.length === 0) return;
+
+      const shuffledBots = [...bots].sort(() => Math.random() - 0.5);
+      const uniqueWinnersPool = shuffledBots.slice(0, Math.min(shuffledBots.length, contest.winnerCount));
+
+      const winners: WinnerInfo[] = [];
+      const prizePerWinner = Math.floor(contest.prizeRub / contest.winnerCount);
+
+      for(const lucky of uniqueWinnersPool) {
+        winners.push({ 
+          name: lucky.name, 
+          payoutValue: lucky.payout || getStableCard(lucky.name), 
+          payoutType: 'card', 
+          registeredAt: lucky.registeredAt, 
+          depositAmount: lucky.depositAmount,
+          prizeWon: prizePerWinner
+        });
+      }
+
+      const profilesRes = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const pData = await profilesRes.json();
+      const currentProfiles = JSON.parse(pData.result || "[]");
+
+      const updatedProfiles = currentProfiles.map((p: any) => {
+        const winSum = winners.filter(w => w.name === p.name).reduce((acc, curr) => acc + curr.prizeWon, 0);
+        if (winSum > 0) return { ...p, totalWon: (p.totalWon || 0) + winSum };
+        return p;
+      });
+
+      await saveGlobalProfilesUpdate(updatedProfiles);
+      const updatedContests = currentContests.map(c => c.id === contestId ? { ...c, isCompleted: true, winners } : c);
+      await saveContestsGlobal(updatedContests);
+    } catch (e) { console.error("Auto draw error", e); }
+  };
+
   const drawWinners = async (contestId: string) => {
     const contest = contests.find(c => c.id === contestId)!;
     const res = await fetch(`${KV_REST_API_URL}/get/participants_${contestId}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
@@ -299,7 +355,8 @@ const App: React.FC = () => {
       const updatedContests = contests.map(c => c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + updated.length - existing.length } : c);
       await saveContestsGlobal(updatedContests);
 
-      saveProfile({ ...profile, participationCount: (profile.participationCount || 0) + 1 });
+      // Сбрасываем флаг верификации после участия, чтобы требовать проверку каждый раз
+      saveProfile({ ...profile, participationCount: (profile.participationCount || 0) + 1, isReferralVerified: false });
       fetchContests(); fetchBotsAndProfiles();
     } catch (e) { console.error("Ошибка регистрации"); }
   };
@@ -447,10 +504,11 @@ const App: React.FC = () => {
                     <div key={c.id} onClick={() => handleStartContest(c)} className="relative bg-soft-gray border border-border-gray p-6 rounded-2xl shadow-lg active:scale-[0.99] transition-all group overflow-hidden">
                       {c.isCompleted ? (
                         <div className="absolute top-4 right-6 px-2.5 py-0.5 bg-deep-gray rounded border border-border-gray text-[7px] font-bold uppercase text-white/30">Завершен</div>
-                      ) : joined ? (
-                        <div className="absolute top-4 right-6 px-2.5 py-0.5 bg-gold/10 rounded border border-gold/30 text-[7px] font-bold uppercase text-gold">Участвую</div>
                       ) : (
-                        c.expiresAt && <div className="absolute top-4 right-6 flex items-center gap-1.5"><ClockIcon className="w-3 h-3 text-gold/50"/><Countdown expiresAt={c.expiresAt}/></div>
+                        <div className="absolute top-4 right-6 flex flex-col items-end gap-2">
+                           {c.expiresAt && <div className="flex items-center gap-1.5"><ClockIcon className="w-3 h-3 text-gold/50"/><Countdown expiresAt={c.expiresAt}/></div>}
+                           {joined && <div className="px-2.5 py-1 bg-gold/10 rounded border border-gold/30 text-[7px] font-bold uppercase text-gold">Вы участвуете</div>}
+                        </div>
                       )}
                       
                       <h3 className="text-base font-bold text-white mb-2 uppercase tracking-tight pr-16 leading-tight">{c.title}</h3>
@@ -532,7 +590,7 @@ const App: React.FC = () => {
                    <div className="w-14 h-14 bg-matte-black rounded-xl flex items-center justify-center border border-border-gray">
                       <UserCircleIcon className="w-8 h-8 text-gold"/>
                    </div>
-                   <div>
+                   <div className="flex-1">
                       <h2 className="text-lg font-bold uppercase text-white tracking-tight">{user?.first_name || "Клиент"}</h2>
                    </div>
                 </div>
@@ -551,9 +609,16 @@ const App: React.FC = () => {
                 <div className="bg-soft-gray p-6 rounded-2xl border border-border-gray space-y-5 shadow-lg">
                    <div className="space-y-2">
                       <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest ml-1">Статус верификации</p>
-                      <button onClick={() => { setIsChecking(true); setTimeout(() => { setIsChecking(false); saveProfile({...profile, isReferralVerified: true}); }, 1500); }} disabled={profile.isReferralVerified || isChecking} className={`w-full py-3.5 rounded-lg text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${profile.isReferralVerified ? 'bg-matte-black border border-green-500/20 text-green-500' : 'bg-gold text-matte-black active:scale-95'}`}>
-                         {isChecking ? <ClockIcon className="w-4 h-4 animate-spin"/> : profile.isReferralVerified ? "Счёт подтвержден" : "Подключить аккаунт"}
-                      </button>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setIsChecking(true); setTimeout(() => { setIsChecking(false); saveProfile({...profile, isReferralVerified: true}); }, 1500); }} disabled={profile.isReferralVerified || isChecking} className={`flex-1 py-3.5 rounded-lg text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${profile.isReferralVerified ? 'bg-matte-black border border-green-500/20 text-green-500' : 'bg-gold text-matte-black active:scale-95'}`}>
+                           {isChecking ? <ClockIcon className="w-4 h-4 animate-spin"/> : profile.isReferralVerified ? "Счёт подтвержден" : "Подключить аккаунт"}
+                        </button>
+                        {profile.isReferralVerified && (
+                          <button onClick={() => saveProfile({...profile, isReferralVerified: false})} className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 active:scale-95 transition-all">
+                            <ArrowRightStartOnRectangleIcon className="w-5 h-5"/>
+                          </button>
+                        )}
+                      </div>
                    </div>
                    <div className="space-y-2">
                       <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest ml-1">Реквизиты</p>
@@ -601,7 +666,7 @@ const App: React.FC = () => {
                      <LinkIcon className="w-16 h-16 text-gold/40 mb-6 flex-shrink-0"/>
                      <h1 className="text-xl font-bold uppercase tracking-tight mb-2">Требуется доступ</h1>
                      <p className="text-[10px] opacity-40 uppercase tracking-widest leading-loose mb-10 px-4">Верифицируйте аккаунт в Beef для участия в тираже на {selectedContest?.prizeRub.toLocaleString()} ₽</p>
-                     <a href={BEEF_LINK} target="_blank" className="w-full py-4 bg-gold text-matte-black rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-all">Открыть Beef</a>
+                     <a href={BEEF_LINK} target="_blank" onClick={() => { setIsChecking(true); setTimeout(() => { setIsChecking(false); saveProfile({...profile, isReferralVerified: true}); setStep(ContestStep.PAYOUT); }, 2000); }} className="w-full py-4 bg-gold text-matte-black rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-all">Открыть Beef</a>
                   </div>
                )}
                {step === ContestStep.PAYOUT && (
