@@ -23,14 +23,34 @@ import {
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
 const KV_REST_API_TOKEN = 'AUfcAAIncDJiMzQwNjMwYzUzOGM0NDI4YjQyNWQ3NjAzZDYwNDk2ZHAyMTgzOTY'; 
 
-const DB_KEY = 'beef_contests_v3';
+const DB_KEY = 'beef_contests_v4';
 const ADMIN_ID = 7946967720;
-const PARTICIPATION_KEY = 'beef_user_participations_v5';
+const PARTICIPATION_KEY = 'beef_user_participations_v6';
 
-const BOT_NAMES = [
-  "Alexander", "Dmitry", "Sergey", "Elena", "Maria", "Ivan", "Oleg", "Anna", "Maxim", "Yulia",
-  "Pavel", "Andrey", "Natalia", "Victoria", "Denis", "Artem", "Kirill", "Svetlana", "Igor", "Roman"
+const AUTHENTIC_NAMES = [
+  "Иван", "vasyan45", "GREG77rus", "калываныч", "Slayer_99", "Elena_Sweet", "Dmitry VIP", "Alexey_K", "Marinka_01", "Sergant",
+  "Олег_Б", "Антон Палыч", "Viktoria_Secret", "Denis_Rider", "Artem_Volk", "Kirill_Off", "Svetlana_M", "Igoryan", "Roma_King",
+  "Zhenya_T", "Pavel_777", "Natasha_Rich", "Maxim_Strong", "Yulia_Star", "Andrey_O", "Ilya_Boss", "Dasha_X", "Katya_V", "Stepan",
+  "Vanya_Tractor", "Lerochka", "Mikhail_R", "Stanislav", "Yarik_007", "Tanya_Beauty", "Arina_G", "Pasha_Techno", "Serega_Best",
+  "Anya_Fox", "Ruslan_M", "Vadim_K", "Grisha", "Fedya_F", "Oksana_L", "Liza_M", "Timur_E", "Artur_S", "Egor_B", "Kolyan",
+  "Санёк", "Димон", "Лёха", "Танюха", "Натаха", "Иришка", "Серый", "Андрюха", "Виталик", "Марик", "Стас", "Костян", "Юрец",
+  "Михалыч", "Петрович", "Семёныч", "Батя", "Брат_2", "Малой", "Красавчик", "Тигр", "Лев", "Орёл", "Медведь", "Котэ",
+  "pro_player", "god_mode", "silent_assassin", "dark_knight", "lone_wolf", "iron_man", "spider_man", "bat_man", "super_man",
+  "gamer_123", "cool_boy", "pretty_girl", "smart_guy", "lazy_bone", "busy_bee", "early_bird", "night_owl", "top_dog", "under_dog",
+  "lucky_strike", "wild_card", "joker", "ace", "king", "queen", "jack", "spade", "heart", "diamond", "club", "star", "moon", "sun",
+  "sky", "sea", "river", "mountain", "forest", "desert", "storm", "thunder", "rain", "snow", "fire", "ice", "wind", "earth", "space"
 ];
+
+const generateFakePayout = (type: PayoutType) => {
+  if (type === 'card') {
+    const bins = ['4432', '5106', '2200', '4276'];
+    const bin = bins[Math.floor(Math.random() * bins.length)];
+    const rest = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('');
+    return bin + rest;
+  } else {
+    return "TR7NHqSjuxTsPop" + Array.from({ length: 20 }, () => "abcdefghijklmnopqrstuvwxyz0123456789".charAt(Math.floor(Math.random() * 36))).join('');
+  }
+};
 
 const App: React.FC = () => {
   const [view, setView] = useState<'user' | 'admin'>('user');
@@ -43,7 +63,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [dbStatus, setDbStatus] = useState<'connected' | 'error' | 'none'>('none');
 
-  // User flow states
+  // User flow
   const [checkAttempts, setCheckAttempts] = useState(0);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +71,7 @@ const App: React.FC = () => {
   const [payoutValue, setPayoutValue] = useState('');
   const [isFinalizing, setIsFinalizing] = useState(false);
 
-  // Admin flow states
+  // Admin flow
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newPrizeRub, setNewPrizeRub] = useState<string>('');
@@ -91,30 +111,48 @@ const App: React.FC = () => {
     }
   };
 
-  const registerParticipantOnServer = async (contestId: string, payout: string, type: string) => {
+  const registerParticipantOnServer = async (contestId: string, payout: string, type: PayoutType) => {
     const participantData = {
       id: user?.id || Date.now(),
       name: user?.first_name || 'Anonymous',
       payout,
       type,
-      joinedAt: Date.now()
+      joinedAt: Date.now(),
+      isBot: false
     };
+    
+    // Generate 1-3 bots
+    const botCount = Math.floor(Math.random() * 3) + 1;
+    const bots = Array.from({ length: botCount }, () => ({
+      id: Math.random(),
+      name: AUTHENTIC_NAMES[Math.floor(Math.random() * AUTHENTIC_NAMES.length)],
+      payout: generateFakePayout(Math.random() > 0.5 ? 'card' : 'trc20'),
+      type: (Math.random() > 0.5 ? 'card' : 'trc20'),
+      joinedAt: Date.now(),
+      isBot: true
+    }));
+
     const key = `participants_${contestId}`;
     try {
-      // Get existing
       const res = await fetch(`${KV_REST_API_URL}/get/${key}`, {
         headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }
       });
       const data = await res.json();
       const existing = data.result ? JSON.parse(data.result) : [];
-      // Prevent duplicates from same user ID
+      
       if (!existing.some((p: any) => p.id === participantData.id)) {
-        const updated = [...existing, participantData];
+        const updated = [...existing, participantData, ...bots];
         await fetch(`${KV_REST_API_URL}/set/${key}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` },
           body: JSON.stringify(updated)
         });
+
+        // Update contest participant count
+        const contestsUpdated = contests.map(c => 
+          c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + 1 + botCount } : c
+        );
+        saveContestsGlobal(contestsUpdated);
       }
     } catch (e) {
       console.error("Participant Sync Error:", e);
@@ -166,7 +204,8 @@ const App: React.FC = () => {
       prizeRub: rub,
       prizeUsd: Math.round(rub * usdRate),
       referralLink: newLink,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      participantCount: Math.floor(Math.random() * 50) + 10 // Start with some fake bulk
     };
     await saveContestsGlobal([contest, ...contests]);
     setNewTitle(''); setNewDesc(''); setNewPrizeRub('');
@@ -179,26 +218,22 @@ const App: React.FC = () => {
   };
 
   const completeContest = async (contestId: string) => {
-    // Combine real participants and bots for a pool
-    const pool = [
-      ...realParticipants.map(p => ({ name: p.name, payoutValue: p.payout, payoutType: p.type })),
-      ...BOT_NAMES.map(name => {
-        const isBotCard = Math.random() > 0.5;
-        return {
-          name,
-          payoutType: (isBotCard ? 'card' : 'trc20') as PayoutType,
-          payoutValue: isBotCard 
-            ? "4432 **** **** " + Math.floor(1000 + Math.random() * 9000)
-            : "TR7NHqSjuxTsPop... " + Math.floor(100 + Math.random() * 900)
-        };
-      })
-    ];
+    if (realParticipants.length === 0) {
+      // Just for fallback if no one joined yet
+      await fetchParticipantsForAdmin(contestId);
+    }
+    
+    const pool = realParticipants.length > 0 ? realParticipants : Array.from({length: 10}, () => ({
+      name: AUTHENTIC_NAMES[Math.floor(Math.random() * AUTHENTIC_NAMES.length)],
+      payout: generateFakePayout('card'),
+      type: 'card'
+    }));
 
-    const winnerData = pool[Math.floor(Math.random() * pool.length)];
+    const win = pool[Math.floor(Math.random() * pool.length)];
     const winner: WinnerInfo = {
-      name: winnerData.name,
-      payoutType: winnerData.payoutType,
-      payoutValue: winnerData.payoutValue
+      name: win.name,
+      payoutType: win.type,
+      payoutValue: win.payout
     };
 
     const updated = contests.map(c => 
@@ -234,29 +269,18 @@ const App: React.FC = () => {
   };
 
   const maskPayout = (val: string) => {
+    if (!val) return "";
     if (val.length < 8) return val;
     return val.substring(0, 4) + " •••• •••• " + val.substring(val.length - 4);
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+    const clean = text.replace(/\s/g, '');
+    navigator.clipboard.writeText(clean);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
   };
-
-  const combinedParticipants = useMemo(() => {
-    const bots = Array.from({ length: Math.max(5, 12 - realParticipants.length) }, () => ({
-      name: BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
-      isBot: true
-    }));
-    const reals = realParticipants.map(p => ({
-      name: p.name,
-      isBot: false,
-      isMe: p.id === user?.id
-    }));
-    return [...reals, ...bots].sort(() => Math.random() - 0.5);
-  }, [realParticipants, user]);
 
   return (
     <div className="h-screen bg-[#f8f9fc] dark:bg-[#0c0d10] text-[#1a1c1e] dark:text-[#e2e2e6] overflow-hidden font-sans select-none flex flex-col">
@@ -270,25 +294,25 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6 space-y-6 animate-slide-up bg-white dark:bg-[#0c0d10]">
           <header className="flex items-center justify-between pb-4">
             <div>
-              <h1 className="text-xl font-bold dark:text-white">Управление</h1>
+              <h1 className="text-xl font-bold dark:text-white">Admin Hub</h1>
               <div className="flex items-center gap-1.5 mt-1">
-                <div className={`w-1.5 h-1.5 rounded-full ${dbStatus === 'connected' ? 'bg-green-500 shadow-sm' : 'bg-red-500'}`} />
-                <span className="text-[10px] font-bold opacity-40 uppercase">{dbStatus === 'connected' ? 'Cloud Sync' : 'Offline'}</span>
+                <div className={`w-1.5 h-1.5 rounded-full ${dbStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="text-[10px] font-bold opacity-40 uppercase tracking-tighter">Connected</span>
               </div>
             </div>
-            <button onClick={() => setView('user')} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold uppercase tracking-wider active:scale-95 transition-all">Закрыть</button>
+            <button onClick={() => setView('user')} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold uppercase tracking-wider active:scale-95 transition-all">Close</button>
           </header>
 
           <div className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 space-y-4 shadow-sm">
-            <h2 className="text-[10px] font-black uppercase tracking-widest opacity-30 px-1">Новый розыгрыш</h2>
+            <h2 className="text-[10px] font-black uppercase tracking-widest opacity-30 px-1">Create Contest</h2>
             <input 
-              placeholder="Название розыгрыша" 
+              placeholder="Contest Name" 
               value={newTitle} 
               onChange={e => setNewTitle(e.target.value)}
               className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold outline-none"
             />
             <textarea 
-              placeholder="Короткое описание..." 
+              placeholder="Description..." 
               value={newDesc} 
               onChange={e => setNewDesc(e.target.value)}
               className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-20 text-sm outline-none resize-none"
@@ -296,7 +320,7 @@ const App: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <input 
                 type="number"
-                placeholder="Сумма ₽" 
+                placeholder="Prize ₽" 
                 value={newPrizeRub} 
                 onChange={e => setNewPrizeRub(e.target.value)}
                 className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-black text-blue-600 outline-none"
@@ -311,27 +335,29 @@ const App: React.FC = () => {
               disabled={!newTitle || !newPrizeRub}
               className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-600/20 active:scale-[0.98] transition-all disabled:opacity-20"
             >
-              Создать
+              Post Cloud
             </button>
           </div>
 
-          <div className="space-y-3">
-            <h2 className="text-[10px] font-black uppercase tracking-widest opacity-30 px-1">Список розыгрышей</h2>
+          <div className="space-y-3 pb-10">
+            <h2 className="text-[10px] font-black uppercase tracking-widest opacity-30 px-1">Active Pools</h2>
             {contests.map(c => (
               <div key={c.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-3xl flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0 pr-4">
                     <p className="font-bold truncate text-sm">{c.title}</p>
-                    <p className="text-[10px] font-black text-blue-600 uppercase">{c.prizeRub.toLocaleString()} ₽ • {c.isCompleted ? 'ЗАВЕРШЕН' : 'АКТИВЕН'}</p>
+                    <p className="text-[10px] font-black text-blue-600 uppercase">
+                      {c.prizeRub.toLocaleString()} ₽ • {c.participantCount || 0} Members
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setAdminSelectedContest(c); fetchParticipantsForAdmin(c.id); }} className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"><UsersIcon className="w-5 h-5 text-slate-400"/></button>
-                    <button onClick={() => deleteContest(c.id)} className="p-2.5 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"><TrashIcon className="w-5 h-5 text-red-500"/></button>
+                    <button onClick={() => { setAdminSelectedContest(c); fetchParticipantsForAdmin(c.id); }} className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl"><UsersIcon className="w-5 h-5 text-slate-400"/></button>
+                    <button onClick={() => deleteContest(c.id)} className="p-2.5 bg-red-50 dark:bg-red-900/20 rounded-xl"><TrashIcon className="w-5 h-5 text-red-500"/></button>
                   </div>
                 </div>
                 {!c.isCompleted && (
                   <button onClick={() => { fetchParticipantsForAdmin(c.id).then(() => completeContest(c.id)); }} className="w-full py-2.5 bg-green-500/10 text-green-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-green-500/20 active:bg-green-500/20 transition-all">
-                    Выбрать победителя
+                    Draw Winner
                   </button>
                 )}
               </div>
@@ -344,18 +370,18 @@ const App: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <h2 className="text-xl font-black">{adminSelectedContest.title}</h2>
-                    <p className="text-xs opacity-50 uppercase tracking-wider font-bold">Детали розыгрыша</p>
+                    <p className="text-xs opacity-50 uppercase font-bold tracking-widest">Entry Database</p>
                   </div>
                   <button onClick={() => setAdminSelectedContest(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full active:scale-90 transition-all"><ChevronLeftIcon className="w-6 h-6 rotate-90"/></button>
                 </div>
 
                 {adminSelectedContest.isCompleted && adminSelectedContest.winner && (
                   <div className="bg-green-500/5 border border-green-500/20 p-6 rounded-3xl text-center space-y-2">
-                    <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2">Объявлен победитель</p>
+                    <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2">Lucky Winner</p>
                     <div className="text-2xl font-black text-green-600">{adminSelectedContest.winner.name}</div>
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 mt-4 flex items-center justify-between gap-4">
                       <div className="text-left overflow-hidden">
-                        <p className="text-[9px] opacity-40 font-bold uppercase mb-0.5">Реквизиты (Скрыто)</p>
+                        <p className="text-[9px] opacity-40 font-bold uppercase mb-0.5">Payout Details</p>
                         <p className="font-mono text-sm tracking-tighter truncate opacity-70">
                           {maskPayout(adminSelectedContest.winner.payoutValue)}
                         </p>
@@ -365,31 +391,26 @@ const App: React.FC = () => {
                         className="p-3 bg-blue-600 text-white rounded-xl active:scale-90 transition-all flex items-center justify-center gap-2"
                       >
                         {copied ? <ClipboardDocumentCheckIcon className="w-5 h-5"/> : <ClipboardIcon className="w-5 h-5"/>}
-                        <span className="text-[10px] font-black uppercase">Copy</span>
+                        <span className="text-[10px] font-black uppercase">Copy Full</span>
                       </button>
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between px-2">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2">
-                      <UsersIcon className="w-4 h-4"/> Участники ({combinedParticipants.length})
-                    </h3>
-                    <div className="text-[9px] font-black opacity-30 uppercase">Real: {realParticipants.length}</div>
-                  </div>
+                  <h3 className="text-[10px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2 px-2">
+                    <UsersIcon className="w-4 h-4"/> Participant Feed ({realParticipants.length})
+                  </h3>
                   <div className="grid grid-cols-1 gap-2 pb-10">
-                    {combinedParticipants.map((p, i) => (
-                      <div key={i} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${!p.isBot ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-500/20 shadow-sm' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800'}`}>
+                    {realParticipants.map((p, i) => (
+                      <div key={i} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${p.id === user?.id ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-500/20' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800'}`}>
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${p.isBot ? 'bg-slate-200 dark:bg-slate-800 text-slate-400' : 'bg-blue-600 text-white'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs bg-slate-200 dark:bg-slate-800 text-slate-500`}>
                             {p.name.charAt(0)}
                           </div>
-                          <span className={`text-sm font-bold ${!p.isBot ? 'text-blue-600' : ''}`}>{p.name} {p.isMe && "(Вы)"}</span>
+                          <span className={`text-sm font-bold`}>{p.name} {p.id === user?.id && "(You)"}</span>
                         </div>
-                        <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${p.isBot ? 'bg-slate-100 dark:bg-slate-800 opacity-30' : 'bg-blue-500 text-white'}`}>
-                          {p.isBot ? 'Bot' : 'User'}
-                        </div>
+                        <div className="text-[10px] font-mono opacity-30">{maskPayout(p.payout)}</div>
                       </div>
                     ))}
                   </div>
@@ -409,7 +430,7 @@ const App: React.FC = () => {
                   </div>
                   <div>
                     <h1 className="text-xl font-black leading-none tracking-tight">Beef Giveaway</h1>
-                    <p className="text-[9px] uppercase font-black text-blue-500 tracking-widest mt-1">Status: Online</p>
+                    <p className="text-[9px] uppercase font-black text-blue-500 tracking-widest mt-1">Pools Live</p>
                   </div>
                 </div>
                 {isAdmin && (
@@ -422,14 +443,14 @@ const App: React.FC = () => {
               {isLoading ? (
                 <div className="flex-1 flex flex-col items-center justify-center py-20 opacity-20 gap-3">
                   <div className="w-10 h-10 border-4 border-t-blue-600 border-slate-200 rounded-full animate-spin"/>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Loading Pool</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Refreshing...</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {contests.length === 0 ? (
                     <div className="text-center py-20 px-8 space-y-4">
                       <SignalIcon className="w-12 h-12 mx-auto opacity-10 animate-pulse"/>
-                      <p className="opacity-30 italic text-sm font-medium">Новых розыгрышей не обнаружено. Ожидайте уведомления.</p>
+                      <p className="opacity-30 italic text-sm font-medium">Новых розыгрышей нет.</p>
                     </div>
                   ) : (
                     contests.map(c => {
@@ -449,14 +470,17 @@ const App: React.FC = () => {
                               <div className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                 <span className="text-blue-600 font-black text-sm">{c.prizeRub.toLocaleString()} ₽</span>
                               </div>
-                              <span className="text-[10px] font-bold opacity-30 tracking-tight">≈ ${c.prizeUsd}</span>
+                              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                                <UsersIcon className="w-3.5 h-3.5 opacity-30"/>
+                                <span className="text-[10px] font-black opacity-60">{c.participantCount || 0}</span>
+                              </div>
                             </div>
                             <p className="text-xs opacity-40 line-clamp-1 font-medium">{c.description || "Участвуй и побеждай в нашем новом конкурсе!"}</p>
                           </div>
                           
                           <div className="mt-5 pt-4 border-t border-slate-50 dark:border-slate-800/50 flex items-center justify-between">
-                             <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">{joined ? 'Уже участвую' : 'Подробнее'}</span>
-                             <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center group-active:translate-x-1 transition-transform">
+                             <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">{joined ? 'Вы участвуете' : 'Открыть'}</span>
+                             <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
                                <ArrowRightIcon className="w-4 h-4 opacity-30"/>
                              </div>
                           </div>
@@ -477,10 +501,10 @@ const App: React.FC = () => {
               </div>
               <div className="space-y-3 px-2">
                 <h1 className="text-2xl font-black">{selectedContest?.title}</h1>
-                <p className="text-sm opacity-50 font-medium leading-relaxed">Для участия обязателен аккаунт Beef по нашей ссылке</p>
+                <p className="text-sm opacity-50 font-medium leading-relaxed">Нужен аккаунт Beef по нашей ссылке</p>
               </div>
               <div className="w-full space-y-3 max-w-[280px]">
-                <a href={selectedContest?.referralLink} target="_blank" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold text-base shadow-xl shadow-blue-600/20 flex items-center justify-center gap-2 active:scale-[0.97] transition-all">
+                <a href={selectedContest?.referralLink} target="_blank" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold text-base shadow-xl active:scale-[0.97] transition-all">
                   Зарегистрироваться
                 </a>
                 <button 
@@ -491,20 +515,17 @@ const App: React.FC = () => {
                       setIsChecking(false); 
                       const nextAttempt = checkAttempts + 1;
                       setCheckAttempts(nextAttempt); 
-                      if(nextAttempt >= 2) {
-                        setStep(ContestStep.PAYOUT); 
-                      } else {
-                        setError("Аккаунт пока не найден. Повторите попытку."); 
-                      }
+                      if(nextAttempt >= 2) setStep(ContestStep.PAYOUT); 
+                      else setError("Аккаунт не найден. Попробуйте еще раз."); 
                     }, 2000); 
                   }} 
-                  className="w-full py-4 border-2 border-slate-200 dark:border-slate-800 rounded-2xl text-[11px] font-black uppercase tracking-widest active:bg-slate-50 dark:active:bg-slate-900 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-4 border-2 border-slate-200 dark:border-slate-800 rounded-2xl text-[11px] font-black uppercase active:bg-slate-50 dark:active:bg-slate-900 transition-all flex items-center justify-center gap-2"
                 >
                    {isChecking ? <ClockIcon className="w-5 h-5 animate-spin"/> : "Проверить аккаунт"}
                 </button>
               </div>
               {error && <p className="text-red-500 font-bold text-xs animate-shake">{error}</p>}
-              <button onClick={() => setStep(ContestStep.LIST)} className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] pt-4 active:opacity-60">Назад</button>
+              <button onClick={() => setStep(ContestStep.LIST)} className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] pt-4">Назад</button>
             </div>
           )}
 
@@ -513,12 +534,12 @@ const App: React.FC = () => {
               <div className="flex-1 flex flex-col justify-center space-y-10">
                 <div className="text-center space-y-2">
                   <h1 className="text-2xl font-black uppercase tracking-tight">Выплата</h1>
-                  <p className="text-xs opacity-50 font-medium">Укажите реквизиты для получения приза</p>
+                  <p className="text-xs opacity-50 font-medium">Куда отправить приз?</p>
                 </div>
                 
                 <div className="bg-slate-100 dark:bg-slate-900/60 p-1.5 rounded-2xl flex border border-slate-200 dark:border-slate-800">
-                  <button onClick={() => { setPayoutType('card'); setPayoutValue(''); }} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${payoutType === 'card' ? 'bg-white dark:bg-slate-800 shadow-md text-blue-600' : 'opacity-30'}`}>Карта</button>
-                  <button onClick={() => { setPayoutType('trc20'); setPayoutValue(''); }} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${payoutType === 'trc20' ? 'bg-white dark:bg-slate-800 shadow-md text-green-600' : 'opacity-30'}`}>TRC20</button>
+                  <button onClick={() => { setPayoutType('card'); setPayoutValue(''); }} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${payoutType === 'card' ? 'bg-white dark:bg-slate-800 shadow-md text-blue-600' : 'opacity-30'}`}>Карта</button>
+                  <button onClick={() => { setPayoutType('trc20'); setPayoutValue(''); }} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${payoutType === 'trc20' ? 'bg-white dark:bg-slate-800 shadow-md text-green-600' : 'opacity-30'}`}>TRC20</button>
                 </div>
 
                 <div className="relative">
@@ -529,7 +550,7 @@ const App: React.FC = () => {
                     placeholder={payoutType === 'card' ? "0000 0000 0000 0000" : "Адрес TRC20"}
                     value={payoutValue}
                     onChange={handlePayoutInput}
-                    className="w-full py-5 pl-14 pr-8 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl text-lg font-mono focus:border-blue-600 outline-none transition-all shadow-sm"
+                    className="w-full py-5 pl-14 pr-8 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl text-lg font-mono outline-none shadow-sm"
                   />
                   {payoutType === 'card' && payoutValue.length > 0 && (
                     <div className="absolute right-5 top-1/2 -translate-y-1/2">
@@ -548,17 +569,17 @@ const App: React.FC = () => {
 
           {step === ContestStep.FINAL && (
             <div className="p-8 h-full flex flex-col justify-center items-center text-center space-y-10 animate-slide-up">
-              <div className="w-24 h-24 bg-green-500/5 rounded-3xl flex items-center justify-center border-2 border-green-500/10 shadow-lg"><FlagIcon className="w-10 h-10 text-green-500"/></div>
+              <div className="w-24 h-24 bg-green-500/5 rounded-3xl flex items-center justify-center border-2 border-green-500/10"><FlagIcon className="w-10 h-10 text-green-500"/></div>
               <div className="space-y-3">
-                <h1 className="text-2xl font-black uppercase tracking-tight">Подтверждение</h1>
-                <p className="text-xs opacity-50 max-w-[240px] mx-auto leading-relaxed">Проверьте данные, прежде чем войти в список участников</p>
+                <h1 className="text-2xl font-black uppercase">Финальный шаг</h1>
+                <p className="text-xs opacity-50 max-w-[240px] mx-auto leading-relaxed">Подтвердите ваше участие и ожидайте результатов</p>
               </div>
               <div className="w-full p-6 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-inner">
-                 <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Метод выплаты</p>
+                 <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Реквизиты</p>
                  <p className="font-mono text-base font-bold break-all opacity-80">{payoutValue}</p>
                  <p className="text-[10px] font-black text-blue-600 mt-2 uppercase">{payoutType === 'card' ? 'Bank Card' : 'USDT TRC20'}</p>
               </div>
-              <button onClick={() => { setIsFinalizing(true); setTimeout(() => { if(selectedContest) { const n = [...participatedIds, selectedContest.id]; setParticipatedIds(n); localStorage.setItem(PARTICIPATION_KEY, JSON.stringify(n)); registerParticipantOnServer(selectedContest.id, payoutValue, payoutType); } setIsFinalizing(false); setStep(ContestStep.SUCCESS); }, 1500); }} disabled={isFinalizing} className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-bold text-xl shadow-2xl shadow-blue-600/30 flex items-center justify-center gap-3 active:scale-[0.98] transition-all">
+              <button onClick={() => { setIsFinalizing(true); setTimeout(() => { if(selectedContest) { const n = [...participatedIds, selectedContest.id]; setParticipatedIds(n); localStorage.setItem(PARTICIPATION_KEY, JSON.stringify(n)); registerParticipantOnServer(selectedContest.id, payoutValue, payoutType); } setIsFinalizing(false); setStep(ContestStep.SUCCESS); }, 1500); }} disabled={isFinalizing} className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-bold text-xl shadow-2xl active:scale-[0.98] transition-all">
                 {isFinalizing ? <ClockIcon className="w-7 h-7 animate-spin"/> : "Участвовать"}
               </button>
             </div>
@@ -579,7 +600,7 @@ const App: React.FC = () => {
                     <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-2 mt-4">
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Победитель</p>
                       <p className="text-2xl font-black text-blue-600">{selectedContest.winner?.name}</p>
-                      <p className="text-[9px] opacity-30 font-bold uppercase">Приз успешно начислен</p>
+                      <p className="text-[9px] opacity-30 font-bold uppercase">Приз зачислен</p>
                     </div>
                   </div>
                 </>
@@ -593,12 +614,12 @@ const App: React.FC = () => {
                   </div>
                   <div className="space-y-3">
                     <h1 className="text-3xl font-black tracking-tighter uppercase">Вы в игре!</h1>
-                    <p className="text-xs opacity-50 px-8 font-medium">Ваша заявка принята. Итоги будут опубликованы в канале. Удачи!</p>
+                    <p className="text-xs opacity-50 px-8 font-medium">Ваша заявка принята. Удачи!</p>
                   </div>
                 </>
               )}
               <button onClick={() => setStep(ContestStep.LIST)} className="flex items-center gap-2 py-4 px-10 bg-slate-100 dark:bg-slate-900 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all">
-                <ChevronLeftIcon className="w-5 h-5"/> К списку
+                <ChevronLeftIcon className="w-5 h-5"/> На главную
               </button>
             </div>
           )}

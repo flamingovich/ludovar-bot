@@ -21,6 +21,7 @@ export interface Contest {
   prizeRub: number;
   prizeUsd: number;
   createdAt: number;
+  participantCount?: number;
   isCompleted?: boolean;
   winner?: WinnerInfo;
 }
