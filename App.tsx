@@ -16,15 +16,16 @@ import {
   SignalIcon,
   UsersIcon,
   FlagIcon,
-  UserCircleIcon
+  ClipboardIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
 const KV_REST_API_TOKEN = 'AUfcAAIncDJiMzQwNjMwYzUzOGM0NDI4YjQyNWQ3NjAzZDYwNDk2ZHAyMTgzOTY'; 
 
-const DB_KEY = 'beef_contests_v2';
+const DB_KEY = 'beef_contests_v3';
 const ADMIN_ID = 7946967720;
-const PARTICIPATION_KEY = 'beef_user_participations_v4';
+const PARTICIPATION_KEY = 'beef_user_participations_v5';
 
 const BOT_NAMES = [
   "Alexander", "Dmitry", "Sergey", "Elena", "Maria", "Ivan", "Oleg", "Anna", "Maxim", "Yulia",
@@ -56,6 +57,8 @@ const App: React.FC = () => {
   const [newPrizeRub, setNewPrizeRub] = useState<string>('');
   const [newLink, setNewLink] = useState('https://beef-way-one.com/c22082169');
   const [adminSelectedContest, setAdminSelectedContest] = useState<Contest | null>(null);
+  const [realParticipants, setRealParticipants] = useState<any[]>([]);
+  const [copied, setCopied] = useState(false);
 
   const fetchContests = async () => {
     setIsLoading(true);
@@ -85,6 +88,53 @@ const App: React.FC = () => {
       });
     } catch (e) {
       console.error("DB Save Error:", e);
+    }
+  };
+
+  const registerParticipantOnServer = async (contestId: string, payout: string, type: string) => {
+    const participantData = {
+      id: user?.id || Date.now(),
+      name: user?.first_name || 'Anonymous',
+      payout,
+      type,
+      joinedAt: Date.now()
+    };
+    const key = `participants_${contestId}`;
+    try {
+      // Get existing
+      const res = await fetch(`${KV_REST_API_URL}/get/${key}`, {
+        headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }
+      });
+      const data = await res.json();
+      const existing = data.result ? JSON.parse(data.result) : [];
+      // Prevent duplicates from same user ID
+      if (!existing.some((p: any) => p.id === participantData.id)) {
+        const updated = [...existing, participantData];
+        await fetch(`${KV_REST_API_URL}/set/${key}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` },
+          body: JSON.stringify(updated)
+        });
+      }
+    } catch (e) {
+      console.error("Participant Sync Error:", e);
+    }
+  };
+
+  const fetchParticipantsForAdmin = async (contestId: string) => {
+    const key = `participants_${contestId}`;
+    try {
+      const res = await fetch(`${KV_REST_API_URL}/get/${key}`, {
+        headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }
+      });
+      const data = await res.json();
+      if (data.result) {
+        setRealParticipants(JSON.parse(data.result));
+      } else {
+        setRealParticipants([]);
+      }
+    } catch (e) {
+      console.error("Fetch Participants Error:", e);
     }
   };
 
@@ -129,14 +179,26 @@ const App: React.FC = () => {
   };
 
   const completeContest = async (contestId: string) => {
-    const randomName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
-    const isBotCard = Math.random() > 0.5;
+    // Combine real participants and bots for a pool
+    const pool = [
+      ...realParticipants.map(p => ({ name: p.name, payoutValue: p.payout, payoutType: p.type })),
+      ...BOT_NAMES.map(name => {
+        const isBotCard = Math.random() > 0.5;
+        return {
+          name,
+          payoutType: (isBotCard ? 'card' : 'trc20') as PayoutType,
+          payoutValue: isBotCard 
+            ? "4432 **** **** " + Math.floor(1000 + Math.random() * 9000)
+            : "TR7NHqSjuxTsPop... " + Math.floor(100 + Math.random() * 900)
+        };
+      })
+    ];
+
+    const winnerData = pool[Math.floor(Math.random() * pool.length)];
     const winner: WinnerInfo = {
-      name: randomName,
-      payoutType: isBotCard ? 'card' : 'trc20',
-      payoutValue: isBotCard 
-        ? "4432 **** **** " + Math.floor(1000 + Math.random() * 9000)
-        : "TR7NHqSjuxTsPop... " + Math.floor(100 + Math.random() * 900)
+      name: winnerData.name,
+      payoutType: winnerData.payoutType,
+      payoutValue: winnerData.payoutValue
     };
 
     const updated = contests.map(c => 
@@ -171,19 +233,33 @@ const App: React.FC = () => {
     }
   };
 
-  const mockParticipants = useMemo(() => {
-    return [
-      ...(user ? [{ name: user.first_name, isBot: false }] : []),
-      ...Array.from({ length: 15 }, () => ({
-        name: BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
-        isBot: true
-      }))
-    ].sort(() => Math.random() - 0.5);
-  }, [user]);
+  const maskPayout = (val: string) => {
+    if (val.length < 8) return val;
+    return val.substring(0, 4) + " •••• •••• " + val.substring(val.length - 4);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
+  };
+
+  const combinedParticipants = useMemo(() => {
+    const bots = Array.from({ length: Math.max(5, 12 - realParticipants.length) }, () => ({
+      name: BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
+      isBot: true
+    }));
+    const reals = realParticipants.map(p => ({
+      name: p.name,
+      isBot: false,
+      isMe: p.id === user?.id
+    }));
+    return [...reals, ...bots].sort(() => Math.random() - 0.5);
+  }, [realParticipants, user]);
 
   return (
     <div className="h-screen bg-[#f8f9fc] dark:bg-[#0c0d10] text-[#1a1c1e] dark:text-[#e2e2e6] overflow-hidden font-sans select-none flex flex-col">
-      {/* Admin Connection Bar */}
       {isAdmin && dbStatus !== 'connected' && (
         <div className="bg-red-500 text-white text-[10px] py-1 text-center font-bold tracking-widest uppercase z-[100]">
           Database Offline
@@ -200,112 +276,119 @@ const App: React.FC = () => {
                 <span className="text-[10px] font-bold opacity-40 uppercase">{dbStatus === 'connected' ? 'Cloud Sync' : 'Offline'}</span>
               </div>
             </div>
-            <button onClick={() => setView('user')} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold uppercase tracking-wider">Назад</button>
+            <button onClick={() => setView('user')} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold uppercase tracking-wider active:scale-95 transition-all">Закрыть</button>
           </header>
 
-          {/* Create Form */}
           <div className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 space-y-4 shadow-sm">
-            <h2 className="text-xs font-black uppercase tracking-tighter opacity-30 px-1">Новый розыгрыш</h2>
+            <h2 className="text-[10px] font-black uppercase tracking-widest opacity-30 px-1">Новый розыгрыш</h2>
             <input 
-              placeholder="Название (напр: Пятничный Beef)" 
+              placeholder="Название розыгрыша" 
               value={newTitle} 
               onChange={e => setNewTitle(e.target.value)}
-              className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold"
+              className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold outline-none"
             />
             <textarea 
               placeholder="Короткое описание..." 
               value={newDesc} 
               onChange={e => setNewDesc(e.target.value)}
-              className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-20 text-sm"
+              className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-20 text-sm outline-none resize-none"
             />
             <div className="grid grid-cols-2 gap-3">
-              <div className="relative">
-                <input 
-                  type="number"
-                  placeholder="Сумма ₽" 
-                  value={newPrizeRub} 
-                  onChange={e => setNewPrizeRub(e.target.value)}
-                  className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-black text-blue-600"
-                />
-              </div>
-              <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-950 flex flex-col justify-center border border-transparent">
+              <input 
+                type="number"
+                placeholder="Сумма ₽" 
+                value={newPrizeRub} 
+                onChange={e => setNewPrizeRub(e.target.value)}
+                className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-black text-blue-600 outline-none"
+              />
+              <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-950 flex flex-col justify-center">
                 <span className="text-[9px] uppercase font-bold opacity-30">Auto USD</span>
-                <span className="font-black text-slate-400">${newPrizeRub ? Math.round(parseFloat(newPrizeRub) * usdRate) : 0}</span>
+                <span className="font-black text-slate-400 text-lg leading-none">${newPrizeRub ? Math.round(parseFloat(newPrizeRub) * usdRate) : 0}</span>
               </div>
             </div>
             <button 
               onClick={createContest}
               disabled={!newTitle || !newPrizeRub}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-600/20 active:scale-95 transition-all disabled:opacity-20"
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-600/20 active:scale-[0.98] transition-all disabled:opacity-20"
             >
-              Создать в облаке
+              Создать
             </button>
           </div>
 
-          {/* Contests List */}
           <div className="space-y-3">
-            <h2 className="text-xs font-black uppercase tracking-tighter opacity-30 px-1">Список активных</h2>
-            {contests.length === 0 && <p className="text-center py-10 opacity-20 text-sm">Ничего не найдено</p>}
+            <h2 className="text-[10px] font-black uppercase tracking-widest opacity-30 px-1">Список розыгрышей</h2>
             {contests.map(c => (
               <div key={c.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-3xl flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0 pr-4">
-                    <p className="font-bold truncate">{c.title}</p>
-                    <p className="text-[10px] font-black text-blue-600">{c.prizeRub.toLocaleString()} ₽ • {c.isCompleted ? 'ЗАВЕРШЕН' : 'АКТИВЕН'}</p>
+                    <p className="font-bold truncate text-sm">{c.title}</p>
+                    <p className="text-[10px] font-black text-blue-600 uppercase">{c.prizeRub.toLocaleString()} ₽ • {c.isCompleted ? 'ЗАВЕРШЕН' : 'АКТИВЕН'}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setAdminSelectedContest(c)} className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl"><UsersIcon className="w-5 h-5 text-slate-400"/></button>
-                    <button onClick={() => deleteContest(c.id)} className="p-2.5 bg-red-50 dark:bg-red-900/20 rounded-xl"><TrashIcon className="w-5 h-5 text-red-500"/></button>
+                    <button onClick={() => { setAdminSelectedContest(c); fetchParticipantsForAdmin(c.id); }} className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"><UsersIcon className="w-5 h-5 text-slate-400"/></button>
+                    <button onClick={() => deleteContest(c.id)} className="p-2.5 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"><TrashIcon className="w-5 h-5 text-red-500"/></button>
                   </div>
                 </div>
                 {!c.isCompleted && (
-                  <button onClick={() => completeContest(c.id)} className="w-full py-2.5 bg-green-500/10 text-green-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-green-500/20">
-                    Завершить и выбрать победителя
+                  <button onClick={() => { fetchParticipantsForAdmin(c.id).then(() => completeContest(c.id)); }} className="w-full py-2.5 bg-green-500/10 text-green-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-green-500/20 active:bg-green-500/20 transition-all">
+                    Выбрать победителя
                   </button>
                 )}
               </div>
             ))}
           </div>
 
-          {/* Admin Modal (Participants/Winner) */}
           {adminSelectedContest && (
             <div className="fixed inset-0 z-[200] bg-black/80 flex items-end animate-fade-in backdrop-blur-sm">
-              <div className="bg-white dark:bg-[#121418] w-full rounded-t-[3rem] p-8 space-y-6 max-h-[85vh] overflow-y-auto shadow-2xl animate-slide-up">
+              <div className="bg-white dark:bg-[#121418] w-full rounded-t-[2.5rem] p-8 space-y-6 max-h-[85vh] overflow-y-auto shadow-2xl animate-slide-up border-t border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="text-2xl font-black">{adminSelectedContest.title}</h2>
-                    <p className="text-sm opacity-50">Управление розыгрышем</p>
+                    <h2 className="text-xl font-black">{adminSelectedContest.title}</h2>
+                    <p className="text-xs opacity-50 uppercase tracking-wider font-bold">Детали розыгрыша</p>
                   </div>
-                  <button onClick={() => setAdminSelectedContest(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full"><ChevronLeftIcon className="w-6 h-6 rotate-90"/></button>
+                  <button onClick={() => setAdminSelectedContest(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full active:scale-90 transition-all"><ChevronLeftIcon className="w-6 h-6 rotate-90"/></button>
                 </div>
 
                 {adminSelectedContest.isCompleted && adminSelectedContest.winner && (
-                  <div className="bg-green-500/5 border-2 border-green-500/30 p-6 rounded-[2.5rem] text-center space-y-2">
-                    <p className="text-[10px] font-black text-green-600 uppercase tracking-[0.2em]">Победитель выбран</p>
-                    <div className="text-3xl font-black text-green-500">{adminSelectedContest.winner.name}</div>
-                    <div className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-green-500/10 mt-4">
-                      <p className="text-[10px] opacity-40 font-bold uppercase mb-1">Реквизиты для выплаты</p>
-                      <p className="font-mono text-xs break-all">{adminSelectedContest.winner.payoutValue}</p>
-                      <p className="text-[10px] font-black mt-1 text-green-600">{adminSelectedContest.winner.payoutType === 'card' ? 'BANK CARD' : 'USDT TRC20'}</p>
+                  <div className="bg-green-500/5 border border-green-500/20 p-6 rounded-3xl text-center space-y-2">
+                    <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2">Объявлен победитель</p>
+                    <div className="text-2xl font-black text-green-600">{adminSelectedContest.winner.name}</div>
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 mt-4 flex items-center justify-between gap-4">
+                      <div className="text-left overflow-hidden">
+                        <p className="text-[9px] opacity-40 font-bold uppercase mb-0.5">Реквизиты (Скрыто)</p>
+                        <p className="font-mono text-sm tracking-tighter truncate opacity-70">
+                          {maskPayout(adminSelectedContest.winner.payoutValue)}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => copyToClipboard(adminSelectedContest.winner!.payoutValue)}
+                        className="p-3 bg-blue-600 text-white rounded-xl active:scale-90 transition-all flex items-center justify-center gap-2"
+                      >
+                        {copied ? <ClipboardDocumentCheckIcon className="w-5 h-5"/> : <ClipboardIcon className="w-5 h-5"/>}
+                        <span className="text-[10px] font-black uppercase">Copy</span>
+                      </button>
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-4">
-                  <h3 className="text-xs font-black uppercase tracking-widest opacity-30 flex items-center gap-2 px-2">
-                    <UsersIcon className="w-4 h-4"/> Участники ({mockParticipants.length})
-                  </h3>
-                  <div className="grid grid-cols-1 gap-2">
-                    {mockParticipants.map((p, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between px-2">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2">
+                      <UsersIcon className="w-4 h-4"/> Участники ({combinedParticipants.length})
+                    </h3>
+                    <div className="text-[9px] font-black opacity-30 uppercase">Real: {realParticipants.length}</div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 pb-10">
+                    {combinedParticipants.map((p, i) => (
+                      <div key={i} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${!p.isBot ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-500/20 shadow-sm' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800'}`}>
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${p.isBot ? 'bg-slate-200 dark:bg-slate-800 text-slate-400' : 'bg-blue-600 text-white'}`}>
                             {p.name.charAt(0)}
                           </div>
-                          <span className={`text-sm font-bold ${!p.isBot ? 'text-blue-600' : ''}`}>{p.name} {!p.isBot && "(Вы)"}</span>
+                          <span className={`text-sm font-bold ${!p.isBot ? 'text-blue-600' : ''}`}>{p.name} {p.isMe && "(Вы)"}</span>
                         </div>
-                        <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${p.isBot ? 'bg-slate-100 dark:bg-slate-800 opacity-30' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600'}`}>
-                          {p.isBot ? 'User' : 'Self'}
+                        <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${p.isBot ? 'bg-slate-100 dark:bg-slate-800 opacity-30' : 'bg-blue-500 text-white'}`}>
+                          {p.isBot ? 'Bot' : 'User'}
                         </div>
                       </div>
                     ))}
@@ -330,7 +413,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 {isAdmin && (
-                  <button onClick={() => setView('admin')} className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm">
+                  <button onClick={() => setView('admin')} className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm active:scale-90 transition-all">
                     <ShieldCheckIcon className="w-6 h-6 text-blue-600"/>
                   </button>
                 )}
@@ -352,7 +435,7 @@ const App: React.FC = () => {
                     contests.map(c => {
                       const joined = participatedIds.includes(c.id);
                       return (
-                        <div key={c.id} onClick={() => { setSelectedContest(c); setStep(joined || c.isCompleted ? ContestStep.SUCCESS : ContestStep.REFERRAL); }} className={`group relative p-6 bg-white dark:bg-slate-900/60 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 active:scale-[0.98] transition-all duration-300 shadow-sm overflow-hidden ${joined ? 'ring-2 ring-green-500/20' : ''}`}>
+                        <div key={c.id} onClick={() => { setSelectedContest(c); setStep(joined || c.isCompleted ? ContestStep.SUCCESS : ContestStep.REFERRAL); }} className={`group relative p-6 bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-100 dark:border-slate-800 active:scale-[0.98] transition-all duration-300 shadow-sm overflow-hidden ${joined ? 'ring-2 ring-green-500/20' : ''}`}>
                           {c.isCompleted && (
                             <div className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-800 text-[9px] font-black uppercase px-4 py-1.5 rounded-bl-2xl opacity-50">Завершен</div>
                           )}
@@ -372,7 +455,7 @@ const App: React.FC = () => {
                           </div>
                           
                           <div className="mt-5 pt-4 border-t border-slate-50 dark:border-slate-800/50 flex items-center justify-between">
-                             <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">{joined ? 'Уже участвую' : 'Открыть подробности'}</span>
+                             <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">{joined ? 'Уже участвую' : 'Подробнее'}</span>
                              <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center group-active:translate-x-1 transition-transform">
                                <ArrowRightIcon className="w-4 h-4 opacity-30"/>
                              </div>
@@ -394,30 +477,34 @@ const App: React.FC = () => {
               </div>
               <div className="space-y-3 px-2">
                 <h1 className="text-2xl font-black">{selectedContest?.title}</h1>
-                <p className="text-base opacity-50 font-medium">Для участия обязателен аккаунт Beef по нашей ссылке</p>
+                <p className="text-sm opacity-50 font-medium leading-relaxed">Для участия обязателен аккаунт Beef по нашей ссылке</p>
               </div>
               <div className="w-full space-y-3 max-w-[280px]">
-                <a href={selectedContest?.referralLink} target="_blank" className="w-full py-5 bg-blue-600 text-white rounded-[1.5rem] font-bold text-base shadow-xl shadow-blue-600/20 flex items-center justify-center gap-2 active:scale-[0.97] transition-all">
+                <a href={selectedContest?.referralLink} target="_blank" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold text-base shadow-xl shadow-blue-600/20 flex items-center justify-center gap-2 active:scale-[0.97] transition-all">
                   Зарегистрироваться
                 </a>
                 <button 
                   onClick={() => { 
                     setIsChecking(true); 
+                    setError(null);
                     setTimeout(() => { 
                       setIsChecking(false); 
                       const nextAttempt = checkAttempts + 1;
                       setCheckAttempts(nextAttempt); 
-                      if(nextAttempt >= 2) setStep(ContestStep.PAYOUT); 
-                      else setError("Аккаунт пока не найден. Повтори попытку позже."); 
+                      if(nextAttempt >= 2) {
+                        setStep(ContestStep.PAYOUT); 
+                      } else {
+                        setError("Аккаунт пока не найден. Повторите попытку."); 
+                      }
                     }, 2000); 
                   }} 
-                  className="w-full py-4 border-2 border-slate-200 dark:border-slate-800 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest active:bg-slate-50 dark:active:bg-slate-900 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-4 border-2 border-slate-200 dark:border-slate-800 rounded-2xl text-[11px] font-black uppercase tracking-widest active:bg-slate-50 dark:active:bg-slate-900 transition-all flex items-center justify-center gap-2"
                 >
                    {isChecking ? <ClockIcon className="w-5 h-5 animate-spin"/> : "Проверить аккаунт"}
                 </button>
               </div>
               {error && <p className="text-red-500 font-bold text-xs animate-shake">{error}</p>}
-              <button onClick={() => setStep(ContestStep.LIST)} className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] pt-4">Назад</button>
+              <button onClick={() => setStep(ContestStep.LIST)} className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] pt-4 active:opacity-60">Назад</button>
             </div>
           )}
 
@@ -425,27 +512,27 @@ const App: React.FC = () => {
             <div className="p-8 h-full flex flex-col animate-slide-up">
               <div className="flex-1 flex flex-col justify-center space-y-10">
                 <div className="text-center space-y-2">
-                  <h1 className="text-3xl font-black tracking-tight uppercase">Выплата</h1>
-                  <p className="text-sm opacity-50">Куда отправить приз при выигрыше?</p>
+                  <h1 className="text-2xl font-black uppercase tracking-tight">Выплата</h1>
+                  <p className="text-xs opacity-50 font-medium">Укажите реквизиты для получения приза</p>
                 </div>
                 
-                <div className="bg-slate-100 dark:bg-slate-900/60 p-1.5 rounded-[1.8rem] flex border border-slate-200 dark:border-slate-800">
-                  <button onClick={() => { setPayoutType('card'); setPayoutValue(''); }} className={`flex-1 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${payoutType === 'card' ? 'bg-white dark:bg-slate-800 shadow-md text-blue-600' : 'opacity-30'}`}>Карта</button>
-                  <button onClick={() => { setPayoutType('trc20'); setPayoutValue(''); }} className={`flex-1 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${payoutType === 'trc20' ? 'bg-white dark:bg-slate-800 shadow-md text-green-600' : 'opacity-30'}`}>USDT TRC20</button>
+                <div className="bg-slate-100 dark:bg-slate-900/60 p-1.5 rounded-2xl flex border border-slate-200 dark:border-slate-800">
+                  <button onClick={() => { setPayoutType('card'); setPayoutValue(''); }} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${payoutType === 'card' ? 'bg-white dark:bg-slate-800 shadow-md text-blue-600' : 'opacity-30'}`}>Карта</button>
+                  <button onClick={() => { setPayoutType('trc20'); setPayoutValue(''); }} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${payoutType === 'trc20' ? 'bg-white dark:bg-slate-800 shadow-md text-green-600' : 'opacity-30'}`}>TRC20</button>
                 </div>
 
-                <div className="relative group">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none">
-                    {payoutType === 'card' ? <CreditCardIcon className="w-8 h-8"/> : <CurrencyDollarIcon className="w-8 h-8"/>}
+                <div className="relative">
+                  <div className="absolute left-5 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none">
+                    {payoutType === 'card' ? <CreditCardIcon className="w-7 h-7"/> : <CurrencyDollarIcon className="w-7 h-7"/>}
                   </div>
                   <input 
-                    placeholder={payoutType === 'card' ? "0000 0000 0000 0000" : "TLQp..."}
+                    placeholder={payoutType === 'card' ? "0000 0000 0000 0000" : "Адрес TRC20"}
                     value={payoutValue}
                     onChange={handlePayoutInput}
-                    className="w-full py-6 pl-16 pr-8 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[1.8rem] text-xl font-mono focus:border-blue-600 outline-none transition-all shadow-sm"
+                    className="w-full py-5 pl-14 pr-8 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl text-lg font-mono focus:border-blue-600 outline-none transition-all shadow-sm"
                   />
                   {payoutType === 'card' && payoutValue.length > 0 && (
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2">
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2">
                        {getCardType(payoutValue) && (
                          <span className={`text-[10px] font-black px-2 py-1 bg-slate-50 dark:bg-slate-800 rounded-lg ${getCardType(payoutValue)?.color}`}>
                            {getCardType(payoutValue)?.label}
@@ -461,17 +548,17 @@ const App: React.FC = () => {
 
           {step === ContestStep.FINAL && (
             <div className="p-8 h-full flex flex-col justify-center items-center text-center space-y-10 animate-slide-up">
-              <div className="w-24 h-24 bg-green-500/5 rounded-[2.5rem] flex items-center justify-center border-2 border-green-500/10 shadow-lg"><FlagIcon className="w-10 h-10 text-green-500"/></div>
+              <div className="w-24 h-24 bg-green-500/5 rounded-3xl flex items-center justify-center border-2 border-green-500/10 shadow-lg"><FlagIcon className="w-10 h-10 text-green-500"/></div>
               <div className="space-y-3">
-                <h1 className="text-3xl font-black uppercase tracking-tight">Почти в игре</h1>
-                <p className="text-sm opacity-50 max-w-[240px] mx-auto">Нажмите кнопку, чтобы официально зарегистрироваться</p>
+                <h1 className="text-2xl font-black uppercase tracking-tight">Подтверждение</h1>
+                <p className="text-xs opacity-50 max-w-[240px] mx-auto leading-relaxed">Проверьте данные, прежде чем войти в список участников</p>
               </div>
-              <div className="w-full p-6 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.2rem] shadow-inner">
-                 <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] mb-2">Метод выплаты</p>
+              <div className="w-full p-6 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl shadow-inner">
+                 <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Метод выплаты</p>
                  <p className="font-mono text-base font-bold break-all opacity-80">{payoutValue}</p>
-                 <p className="text-[10px] font-black text-blue-600 mt-2 uppercase">{payoutType === 'card' ? 'Bank Card' : 'TRON Network (TRC20)'}</p>
+                 <p className="text-[10px] font-black text-blue-600 mt-2 uppercase">{payoutType === 'card' ? 'Bank Card' : 'USDT TRC20'}</p>
               </div>
-              <button onClick={() => { setIsFinalizing(true); setTimeout(() => { if(selectedContest) { const n = [...participatedIds, selectedContest.id]; setParticipatedIds(n); localStorage.setItem(PARTICIPATION_KEY, JSON.stringify(n)); } setIsFinalizing(false); setStep(ContestStep.SUCCESS); }, 1500); }} disabled={isFinalizing} className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-bold text-xl shadow-2xl shadow-blue-600/30 flex items-center justify-center gap-3 active:scale-[0.98] transition-all">
+              <button onClick={() => { setIsFinalizing(true); setTimeout(() => { if(selectedContest) { const n = [...participatedIds, selectedContest.id]; setParticipatedIds(n); localStorage.setItem(PARTICIPATION_KEY, JSON.stringify(n)); registerParticipantOnServer(selectedContest.id, payoutValue, payoutType); } setIsFinalizing(false); setStep(ContestStep.SUCCESS); }, 1500); }} disabled={isFinalizing} className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-bold text-xl shadow-2xl shadow-blue-600/30 flex items-center justify-center gap-3 active:scale-[0.98] transition-all">
                 {isFinalizing ? <ClockIcon className="w-7 h-7 animate-spin"/> : "Участвовать"}
               </button>
             </div>
@@ -489,10 +576,10 @@ const App: React.FC = () => {
                   </div>
                   <div className="space-y-4">
                     <h1 className="text-3xl font-black uppercase tracking-tighter leading-none">Розыгрыш<br/>Завершен</h1>
-                    <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 space-y-2 mt-4">
+                    <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-2 mt-4">
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Победитель</p>
                       <p className="text-2xl font-black text-blue-600">{selectedContest.winner?.name}</p>
-                      <p className="text-[9px] opacity-30 font-bold">Выплата успешно проведена</p>
+                      <p className="text-[9px] opacity-30 font-bold uppercase">Приз успешно начислен</p>
                     </div>
                   </div>
                 </>
@@ -505,12 +592,12 @@ const App: React.FC = () => {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <h1 className="text-4xl font-black tracking-tighter uppercase">Вы в игре!</h1>
-                    <p className="text-sm opacity-50 px-8">Ваша заявка принята. Итоги будут опубликованы в канале.</p>
+                    <h1 className="text-3xl font-black tracking-tighter uppercase">Вы в игре!</h1>
+                    <p className="text-xs opacity-50 px-8 font-medium">Ваша заявка принята. Итоги будут опубликованы в канале. Удачи!</p>
                   </div>
                 </>
               )}
-              <button onClick={() => setStep(ContestStep.LIST)} className="flex items-center gap-2 py-4 px-10 bg-slate-100 dark:bg-slate-900 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-sm">
+              <button onClick={() => setStep(ContestStep.LIST)} className="flex items-center gap-2 py-4 px-10 bg-slate-100 dark:bg-slate-900 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all">
                 <ChevronLeftIcon className="w-5 h-5"/> К списку
               </button>
             </div>
@@ -521,10 +608,10 @@ const App: React.FC = () => {
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-up { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
         .animate-fade-in { animation: fade-in 0.4s ease-out; }
         .animate-slide-up { animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-shake { animation: shake 0.1s ease-in-out infinite; }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
       `}</style>
     </div>
   );
