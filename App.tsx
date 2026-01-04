@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile } from './types';
 import { BotParticipant } from './bots';
 import { 
@@ -124,13 +124,13 @@ const App: React.FC = () => {
           const b = rawBots[key];
           return {
             id: key,
-            name: b.name,
-            registeredAt: b.registeredAt,
-            depositAmount: b.depositAmount,
-            payout: b.creditCard || getStableCard(b.name),
+            name: b.name || key.replace('bot ', ''),
+            registeredAt: b.registeredAt || '01.01.2025',
+            depositAmount: b.depositAmount || 0,
+            payout: b.creditCard || getStableCard(b.name || key),
             isBot: true,
-            participationCount: b.participationCount,
-            totalWon: b.totalWon
+            participationCount: b.participationCount || 1,
+            totalWon: b.totalWon || 0
           };
         });
         setBotsPool(mappedBots);
@@ -266,39 +266,66 @@ const App: React.FC = () => {
     }, 5000);
   };
 
+  // ОСНОВНОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ
   const registerParticipant = async (contestId: string, payout: string, type: PayoutType) => {
-    // Симуляция участия ботов: от 1 до 3 бота на 1 реального пользователя
+    // 1. Выбираем ботов (1-3)
     const botCount = Math.floor(Math.random() * 3) + 1; 
     const selectedBots = [];
-    const tempPool = [...botsPool];
+    const tempPool = botsPool.length > 0 ? [...botsPool] : [];
 
-    // Случайный выбор ботов из пула
-    for(let i=0; i<Math.min(botCount, tempPool.length); i++) {
-      const idx = Math.floor(Math.random() * tempPool.length);
-      const bot = tempPool[idx];
-      selectedBots.push(bot);
-      tempPool.splice(idx, 1);
+    if (tempPool.length > 0) {
+      for(let i=0; i < Math.min(botCount, tempPool.length); i++) {
+        const idx = Math.floor(Math.random() * tempPool.length);
+        const bot = tempPool[idx];
+        selectedBots.push(bot);
+        tempPool.splice(idx, 1);
+      }
     }
 
+    // 2. Получаем текущий список участников конкурса
     const key = `participants_${contestId}`;
-    const res = await fetch(`${KV_REST_API_URL}/get/${key}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
-    const data = await res.json();
-    const existing = data.result ? JSON.parse(data.result) : [];
+    const partRes = await fetch(`${KV_REST_API_URL}/get/${key}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+    const partData = await partRes.json();
+    const existingParticipants = partData.result ? JSON.parse(partData.result) : [];
     
-    // Добавляем юзера и выбранных ботов
-    const updated = [
-      ...existing, 
-      { id: user?.id, name: user?.first_name || 'User', payout, type, isBot: false, registeredAt: new Date().toLocaleDateString('ru-RU'), depositAmount: 0 }, 
-      ...selectedBots
-    ];
+    // 3. Формируем новый список
+    const newEntry = { 
+      id: user?.id, 
+      name: user?.first_name || 'User', 
+      payout, 
+      type, 
+      isBot: false, 
+      registeredAt: new Date().toLocaleDateString('ru-RU'), 
+      depositAmount: 0 
+    };
     
-    await fetch(`${KV_REST_API_URL}/set/${key}`, { method: 'POST', headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, body: JSON.stringify(updated) });
+    const updatedParticipants = [...existingParticipants, newEntry, ...selectedBots];
+    
+    // 4. Сохраняем участников
+    await fetch(`${KV_REST_API_URL}/set/${key}`, { 
+      method: 'POST', 
+      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
+      body: JSON.stringify(updatedParticipants) 
+    });
 
-    const contestsUpdated = contests.map(c => c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + 1 + selectedBots.length } : c);
-    saveContestsGlobal(contestsUpdated);
+    // 5. Получаем СВЕЖИЙ список конкурсов перед обновлением счетчика
+    const contestsRes = await fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+    const contestsData = await contestsRes.json();
+    const currentContests: Contest[] = contestsData.result ? JSON.parse(contestsData.result) : contests;
+
+    // 6. Обновляем счетчик
+    const totalAdded = 1 + selectedBots.length;
+    const contestsUpdated = currentContests.map(c => 
+      c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + totalAdded } : c
+    );
     
+    await saveContestsGlobal(contestsUpdated);
+    
+    // 7. Обновляем локальный профиль юзера
     const newParticipationCount = (profile.participationCount || 0) + 1;
     saveProfile({ ...profile, participationCount: newParticipationCount });
+    
+    console.log(`Registered user + ${selectedBots.length} bots. Total new: ${totalAdded}`);
   };
 
   const showPublicProfile = (name: string, isBot: boolean, id?: string) => {
