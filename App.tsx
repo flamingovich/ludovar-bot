@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile } from './types';
+import { BOTS_POOL } from './bots';
 import { 
   CheckBadgeIcon, 
   CreditCardIcon, 
@@ -32,31 +33,6 @@ const PROFILE_KEY = 'beef_user_profile_final';
 const PARTICIPATION_KEY = 'beef_user_participations_final';
 
 const BEEF_LINK = 'https://v.beef.gg/LUDOVAR';
-
-const MALE_NAMES = ["Иван", "Санек", "Димон", "Лёха", "Серёга", "Андрюха", "Виталик", "Марик", "Стас", "Костян", "Юрец", "Михалыч", "Петрович", "Батя", "Малой", "Тигр", "Лев", "Орёл", "Медведь", "Серый", "Зубенко", "Калываныч", "Гриша", "Федя", "Колян", "Жека", "Тёма", "Ромчик", "Павлик", "Тоха", "Миха", "vavan", "crazy_dog"];
-const FEMALE_NAMES = ["Маринка", "Елена", "Виктория", "Натаха", "Танюха", "Иришка", "Даша", "Катя", "Оксана", "Лиза", "Аня", "Светка", "Юльча", "Машка", "Кристи", "Vika_L", "Katya_Z"];
-const SUFFIXES = ["777", "rus", "_top", "_vip", "X", "007", "88", "99", "77", "_best", "_king", "pro", "Gamer", "_77", "off", "X_X"];
-const EMOJIS = ["🔥", "⚡️", "💎", "🎯", "🚀", "👑", "🍀", "🕶", "🌪", "🧊", "💰", "🎰"];
-
-const generateAuthenticName = () => {
-  const isFemale = Math.random() < 0.05;
-  const list = isFemale ? FEMALE_NAMES : MALE_NAMES;
-  const base = list[Math.floor(Math.random() * list.length)];
-  let name = base;
-  if (Math.random() < 0.4) name += SUFFIXES[Math.floor(Math.random() * SUFFIXES.length)];
-  if (Math.random() < 0.3) name += " " + EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-  return { name, isPremium: Math.random() < 0.15 };
-};
-
-const generateProfileStats = () => {
-  const start = new Date(2025, 8, 1).getTime();
-  const date = new Date(start + Math.random() * (Date.now() - start));
-  const hasDeposit = Math.random() < 0.6;
-  return {
-    registeredAt: date.toLocaleDateString('ru-RU'),
-    depositAmount: hasDeposit ? Math.floor(500 + Math.random() * 149500) : 0
-  };
-};
 
 const formatCard = (val: string) => {
   const v = val.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
@@ -186,19 +162,35 @@ const App: React.FC = () => {
     const partData = await partRes.json();
     const pool = partData.result ? JSON.parse(partData.result) : [];
     
-    const fullPool = pool.length > 5 ? pool : [...pool, ...Array.from({length: 15}, () => ({ name: generateAuthenticName().name, payout: '4432' + Math.random().toString().slice(2, 14), type: 'card' as PayoutType }))];
+    // Пул из реальных участников и ФИКСИРОВАННЫХ ботов
+    const fullPool = pool.length > 5 ? pool : [...pool, ...BOTS_POOL];
 
     const winners: WinnerInfo[] = [];
-    for(let i=0; i < contest.winnerCount; i++) {
-      const lucky = fullPool[Math.floor(Math.random() * fullPool.length)];
-      winners.push({ name: lucky.name, payoutValue: lucky.payout, payoutType: lucky.type, ...generateProfileStats() });
+    for(let i=0; i < Math.min(contest.winnerCount, fullPool.length); i++) {
+      const luckyIndex = Math.floor(Math.random() * fullPool.length);
+      const lucky = fullPool[luckyIndex];
+      winners.push({ 
+        name: lucky.name, 
+        payoutValue: lucky.payout || lucky.payoutValue, 
+        payoutType: (lucky.type || lucky.payoutType) as PayoutType, 
+        registeredAt: lucky.registeredAt, 
+        depositAmount: lucky.depositAmount 
+      });
+      // Чтобы один и тот же не выиграл дважды в одном конкурсе
+      fullPool.splice(luckyIndex, 1);
     }
 
     const rItems = Array.from({ length: 60 }, () => {
-      const p = fullPool[Math.floor(Math.random() * fullPool.length)];
+      // Для рулетки используем весь доступный пул
+      const basePool = [...pool, ...BOTS_POOL];
+      const p = basePool[Math.floor(Math.random() * basePool.length)];
       return { name: p.name, isPremium: Math.random() < 0.15 };
     });
-    rItems[52] = { name: winners[0].name, isPremium: Math.random() < 0.15 };
+    
+    if (winners.length > 0) {
+      rItems[52] = { name: winners[0].name, isPremium: Math.random() < 0.15 };
+    }
+    
     setRouletteItems(rItems);
     setIsRolling(true);
 
@@ -212,20 +204,36 @@ const App: React.FC = () => {
   };
 
   const registerParticipant = async (contestId: string, payout: string, type: PayoutType) => {
+    // Выбираем 1-3 случайных бота из фиксированного пула для создания массовки
     const botCount = Math.floor(Math.random() * 3) + 1;
-    const bots = Array.from({ length: botCount }, () => ({
-      name: generateAuthenticName().name,
-      payout: '4432' + Math.random().toString().slice(2, 14),
-      type: 'card' as PayoutType,
-      isBot: true
-    }));
+    const selectedBots = [];
+    const tempPool = [...BOTS_POOL];
+    for(let i=0; i<botCount; i++) {
+      const idx = Math.floor(Math.random() * tempPool.length);
+      selectedBots.push(tempPool[idx]);
+      tempPool.splice(idx, 1);
+    }
 
     const key = `participants_${contestId}`;
     const res = await fetch(`${KV_REST_API_URL}/get/${key}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
     const data = await res.json();
     const existing = data.result ? JSON.parse(data.result) : [];
     
-    const updated = [...existing, { id: user?.id, name: user?.first_name || 'User', payout, type, isBot: false }, ...bots];
+    // Добавляем реального пользователя и выбранных фиксированных ботов
+    const updated = [
+      ...existing, 
+      { 
+        id: user?.id, 
+        name: user?.first_name || 'User', 
+        payout, 
+        type, 
+        isBot: false, 
+        registeredAt: new Date().toLocaleDateString('ru-RU'), 
+        depositAmount: 0 
+      }, 
+      ...selectedBots
+    ];
+    
     await fetch(`${KV_REST_API_URL}/set/${key}`, { method: 'POST', headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, body: JSON.stringify(updated) });
 
     const contestsUpdated = contests.map(c => c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + 1 + botCount } : c);
@@ -322,7 +330,7 @@ const App: React.FC = () => {
                       {realParticipants.length > 0 ? realParticipants.map((p, i) => (
                         <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex justify-between items-center">
                            <span className="text-sm font-medium truncate pr-4">{p.name}</span>
-                           <span className="text-[10px] font-mono opacity-30 flex-shrink-0">**** {p.payout.slice(-4)}</span>
+                           <span className="text-[10px] font-mono opacity-30 flex-shrink-0">**** {p.payout ? p.payout.slice(-4) : '****'}</span>
                         </div>
                       )) : (
                         <p className="text-center text-[10px] font-bold opacity-20 py-10 uppercase tracking-widest">Список участников пуст</p>
