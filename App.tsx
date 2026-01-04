@@ -33,7 +33,6 @@ const ADMIN_ID = 7946967720;
 const PROFILE_KEY = 'beef_user_profile_final';
 const PARTICIPATION_KEY = 'beef_user_participations_final';
 const GLOBAL_PROFILES_KEY = 'beef_global_profiles_v3'; 
-const BOTS_DB_KEY = 'beef_global_profiles_v2'; 
 
 const BEEF_LINK = 'https://v.beef.gg/LUDOVAR';
 
@@ -76,7 +75,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [globalProfiles, setGlobalProfiles] = useState<Record<string, any>>({});
+  const [globalProfiles, setGlobalProfiles] = useState<any[]>([]);
   const [viewedProfile, setViewedProfile] = useState<any | null>(null);
 
   const [newTitle, setNewTitle] = useState('');
@@ -116,60 +115,53 @@ const App: React.FC = () => {
 
   const fetchBotsAndProfiles = async () => {
     try {
-      const botRes = await fetch(`${KV_REST_API_URL}/get/${BOTS_DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
-      const botData = await botRes.json();
-      if (botData.result) {
-        const rawBots = JSON.parse(botData.result);
-        const mappedBots: BotParticipant[] = Object.keys(rawBots).map(key => {
-          const b = rawBots[key];
-          return {
-            id: key,
-            name: b.name || key.replace('bot ', ''),
-            registeredAt: b.registeredAt || '01.01.2025',
-            depositAmount: b.depositAmount || 0,
-            payout: b.creditCard || getStableCard(b.name || key),
-            isBot: true,
-            participationCount: b.participationCount || 1,
-            totalWon: b.totalWon || 0
-          };
-        });
-        setBotsPool(mappedBots);
-      }
-
       const res = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const data = await res.json();
-      if (data.result) setGlobalProfiles(JSON.parse(data.result));
+      if (data.result) {
+        const rawProfiles = JSON.parse(data.result);
+        setGlobalProfiles(rawProfiles);
+        
+        // Мапим профили в пул ботов (фильтруем тех, у кого нет Telegram ID, т.е. ботов из списка)
+        const mappedBots: BotParticipant[] = rawProfiles.map((p: any) => ({
+          id: p.name,
+          name: p.name,
+          registeredAt: p.registeredAt || '01.01.2025',
+          depositAmount: p.depositAmount || 0,
+          payout: p.creditCard || getStableCard(p.name),
+          isBot: true,
+          participationCount: p.participationCount || 0,
+          totalWon: p.totalWon || 0
+        }));
+        setBotsPool(mappedBots);
+      }
     } catch (e) { console.error(e); }
   };
 
-  const saveGlobalProfile = async (id: string, update: any) => {
-    const current = { ...globalProfiles };
-    current[id] = { ...(current[id] || { participationCount: 0, totalWon: 0 }), ...update };
-    setGlobalProfiles(current);
+  const saveGlobalProfilesUpdate = async (updated: any[]) => {
+    setGlobalProfiles(updated);
     try {
       await fetch(`${KV_REST_API_URL}/set/${GLOBAL_PROFILES_KEY}`, { 
         method: 'POST', 
         headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
-        body: JSON.stringify(current) 
+        body: JSON.stringify(updated) 
       });
     } catch (e) { console.error(e); }
   };
 
   const saveContestsGlobal = async (updated: Contest[]) => {
     setContests(updated);
-    try { await fetch(`${KV_REST_API_URL}/set/${DB_KEY}`, { method: 'POST', headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, body: JSON.stringify(updated) }); } catch (e) { console.error(e); }
+    try { 
+      await fetch(`${KV_REST_API_URL}/set/${DB_KEY}`, { 
+        method: 'POST', 
+        headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
+        body: JSON.stringify(updated) 
+      }); 
+    } catch (e) { console.error(e); }
   };
 
   const saveProfile = (updated: UserProfile) => {
     setProfile(updated);
     localStorage.setItem(PROFILE_KEY, JSON.stringify(updated));
-    if (user?.id) {
-      saveGlobalProfile(user.id.toString(), { 
-        participationCount: updated.participationCount, 
-        totalWon: updated.totalWon,
-        name: user.first_name
-      });
-    }
   };
 
   const isAdmin = useMemo(() => user?.id === ADMIN_ID, [user]);
@@ -226,15 +218,14 @@ const App: React.FC = () => {
     const partData = await partRes.json();
     const pool = partData.result ? JSON.parse(partData.result) : [];
     
-    const botParticipants = pool.filter((p: any) => p.isBot);
-    const availableBots = botParticipants.length >= contest.winnerCount ? botParticipants : [...botsPool];
-
     const winners: WinnerInfo[] = [];
     const prizePerWinner = Math.floor(contest.prizeRub / contest.winnerCount);
 
-    for(let i=0; i < Math.min(contest.winnerCount, availableBots.length); i++) {
-      const luckyIndex = Math.floor(Math.random() * availableBots.length);
-      const lucky = availableBots[luckyIndex];
+    // Выбираем победителей из общего пула участников конкурса
+    const tempPool = [...pool];
+    for(let i=0; i < Math.min(contest.winnerCount, tempPool.length); i++) {
+      const luckyIndex = Math.floor(Math.random() * tempPool.length);
+      const lucky = tempPool[luckyIndex];
       
       winners.push({ 
         name: lucky.name, 
@@ -244,7 +235,7 @@ const App: React.FC = () => {
         depositAmount: lucky.depositAmount,
         prizeWon: prizePerWinner
       });
-      availableBots.splice(luckyIndex, 1);
+      tempPool.splice(luckyIndex, 1);
     }
 
     setPickingStatus('Анализируем активности...');
@@ -258,93 +249,116 @@ const App: React.FC = () => {
 
     setTimeout(async () => {
       clearInterval(interval);
-      const updated = contests.map(c => c.id === contestId ? { ...c, isCompleted: true, winners } : c);
-      await saveContestsGlobal(updated);
+      
+      // Обновляем массив глобальных профилей (totalWon для ботов)
+      const profilesRes = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const profilesData = await profilesRes.json();
+      const currentProfiles = profilesData.result ? JSON.parse(profilesData.result) : [...globalProfiles];
+
+      const updatedProfiles = currentProfiles.map((p: any) => {
+        const win = winners.find(w => w.name === p.name);
+        if (win) {
+          return { ...p, totalWon: (p.totalWon || 0) + win.prizeWon };
+        }
+        return p;
+      });
+
+      await saveGlobalProfilesUpdate(updatedProfiles);
+
+      const updatedContests = contests.map(c => c.id === contestId ? { ...c, isCompleted: true, winners } : c);
+      await saveContestsGlobal(updatedContests);
+      
       setIsPickingWinner(false);
-      setAdminSelectedContest(updated.find(c => c.id === contestId)!);
+      setAdminSelectedContest(updatedContests.find(c => c.id === contestId)!);
       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('heavy');
     }, 5000);
   };
 
-  // ОСНОВНОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ
   const registerParticipant = async (contestId: string, payout: string, type: PayoutType) => {
-    // 1. Выбираем ботов (1-3)
+    // 1. Выбираем ботов (1-3) из актуального botsPool
     const botCount = Math.floor(Math.random() * 3) + 1; 
-    const selectedBots = [];
-    const tempPool = botsPool.length > 0 ? [...botsPool] : [];
+    let selectedBots: any[] = [];
+    const tempPool = [...botsPool];
 
-    if (tempPool.length > 0) {
-      for(let i=0; i < Math.min(botCount, tempPool.length); i++) {
-        const idx = Math.floor(Math.random() * tempPool.length);
-        const bot = tempPool[idx];
-        selectedBots.push(bot);
-        tempPool.splice(idx, 1);
-      }
+    for(let i=0; i < Math.min(botCount, tempPool.length); i++) {
+      const idx = Math.floor(Math.random() * tempPool.length);
+      const bot = tempPool[idx];
+      selectedBots.push(bot);
+      tempPool.splice(idx, 1);
     }
 
-    // 2. Получаем текущий список участников конкурса
-    const key = `participants_${contestId}`;
-    const partRes = await fetch(`${KV_REST_API_URL}/get/${key}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
-    const partData = await partRes.json();
-    const existingParticipants = partData.result ? JSON.parse(partData.result) : [];
-    
-    // 3. Формируем новый список
-    const newEntry = { 
-      id: user?.id, 
-      name: user?.first_name || 'User', 
-      payout, 
-      type, 
-      isBot: false, 
-      registeredAt: new Date().toLocaleDateString('ru-RU'), 
-      depositAmount: 0 
-    };
-    
-    const updatedParticipants = [...existingParticipants, newEntry, ...selectedBots];
-    
-    // 4. Сохраняем участников
-    await fetch(`${KV_REST_API_URL}/set/${key}`, { 
-      method: 'POST', 
-      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
-      body: JSON.stringify(updatedParticipants) 
-    });
+    try {
+      // 2. Получаем участников конкурса
+      const key = `participants_${contestId}`;
+      const partRes = await fetch(`${KV_REST_API_URL}/get/${key}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const partData = await partRes.json();
+      const existingParticipants = partData.result ? JSON.parse(partData.result) : [];
+      
+      // 3. Добавляем реального юзера
+      const newEntry = { 
+        id: user?.id, 
+        name: user?.first_name || 'User', 
+        payout, 
+        type, 
+        isBot: false, 
+        registeredAt: new Date().toLocaleDateString('ru-RU'), 
+        depositAmount: 0 
+      };
+      
+      const updatedParticipants = [...existingParticipants, newEntry, ...selectedBots];
+      
+      // 4. Сохраняем участников в БД конкурса
+      await fetch(`${KV_REST_API_URL}/set/${key}`, { 
+        method: 'POST', 
+        headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, 
+        body: JSON.stringify(updatedParticipants) 
+      });
 
-    // 5. Получаем СВЕЖИЙ список конкурсов перед обновлением счетчика
-    const contestsRes = await fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
-    const contestsData = await contestsRes.json();
-    const currentContests: Contest[] = contestsData.result ? JSON.parse(contestsData.result) : contests;
+      // 5. ОБНОВЛЯЕМ participationCount в GLOBAL_PROFILES_KEY для выбранных ботов
+      const profilesRes = await fetch(`${KV_REST_API_URL}/get/${GLOBAL_PROFILES_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const profilesData = await profilesRes.json();
+      const currentProfiles = profilesData.result ? JSON.parse(profilesData.result) : [...globalProfiles];
 
-    // 6. Обновляем счетчик
-    const totalAdded = 1 + selectedBots.length;
-    const contestsUpdated = currentContests.map(c => 
-      c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + totalAdded } : c
-    );
-    
-    await saveContestsGlobal(contestsUpdated);
-    
-    // 7. Обновляем локальный профиль юзера
-    const newParticipationCount = (profile.participationCount || 0) + 1;
-    saveProfile({ ...profile, participationCount: newParticipationCount });
-    
-    console.log(`Registered user + ${selectedBots.length} bots. Total new: ${totalAdded}`);
+      const updatedProfiles = currentProfiles.map((p: any) => {
+        if (selectedBots.some(sb => sb.name === p.name)) {
+          return { ...p, participationCount: (p.participationCount || 0) + 1 };
+        }
+        return p;
+      });
+
+      await saveGlobalProfilesUpdate(updatedProfiles);
+
+      // 6. Обновляем счетчик участников в списке конкурсов
+      const contestsRes = await fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
+      const contestsData = await contestsRes.json();
+      const currentContests: Contest[] = contestsData.result ? JSON.parse(contestsData.result) : contests;
+
+      const totalAdded = 1 + selectedBots.length;
+      const contestsUpdated = currentContests.map(c => 
+        c.id === contestId ? { ...c, participantCount: (c.participantCount || 0) + totalAdded } : c
+      );
+      
+      await saveContestsGlobal(contestsUpdated);
+      
+      // 7. Локальное обновление
+      const newCount = (profile.participationCount || 0) + 1;
+      saveProfile({ ...profile, participationCount: newCount });
+      
+      fetchContests(); // Обновить UI
+      fetchBotsAndProfiles(); // Обновить локальный пул ботов со свежей статистикой
+      
+      console.log(`Зарегистрировано: +1 юзер и +${selectedBots.length} ботов. Статистика в v3 обновлена.`);
+    } catch (err) {
+      console.error("Ошибка регистрации:", err);
+      setError("Ошибка связи с сервером.");
+    }
   };
 
-  const showPublicProfile = (name: string, isBot: boolean, id?: string) => {
-    let stats = null;
-    if (isBot) {
-       const botInPool = botsPool.find(b => b.name === name);
-       if (botInPool) {
-         stats = {
-           participationCount: botInPool.participationCount || 1,
-           totalWon: botInPool.totalWon || 0,
-           registeredAt: botInPool.registeredAt
-         };
-       }
-    } else {
-       stats = globalProfiles[id || ''];
-    }
-
+  const showPublicProfile = (name: string, isBot: boolean) => {
+    // Ищем профиль в загруженном массиве глобальных профилей
+    const stats = globalProfiles.find(p => p.name === name);
     if (stats) {
-      setViewedProfile({ name, ...stats, isBot });
+      setViewedProfile({ ...stats, isBot });
     } else {
       setViewedProfile({ name, participationCount: 1, totalWon: 0, isBot });
     }
@@ -471,7 +485,7 @@ const App: React.FC = () => {
                     <h3 className="text-xs font-black uppercase opacity-30 flex items-center gap-2 px-1"><UsersIcon className="w-4 h-4"/> Участники ({realParticipants.length})</h3>
                     <div className="grid grid-cols-1 gap-2 pb-6">
                       {realParticipants.length > 0 ? realParticipants.map((p, i) => (
-                        <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex justify-between items-center" onClick={() => showPublicProfile(p.name, p.isBot, p.id?.toString())}>
+                        <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 rounded-2xl flex justify-between items-center" onClick={() => showPublicProfile(p.name, p.isBot)}>
                            <span className="text-sm font-medium truncate pr-4">{p.name}</span>
                            <span className="text-[10px] font-mono opacity-30 flex-shrink-0">**** {p.payout ? p.payout.slice(-4) : '****'}</span>
                         </div>
