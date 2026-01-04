@@ -7,16 +7,24 @@ export interface TelegramUser {
   photo_url?: string;
 }
 
+export interface Contest {
+  id: string;
+  title: string;
+  description: string;
+  referralLink: string;
+  createdAt: number;
+}
+
 export enum ContestStep {
-  REFERRAL = 0,
-  PAYOUT = 1,
-  FINAL = 2,
-  SUCCESS = 3
+  LIST = 'list',
+  REFERRAL = 'referral',
+  PAYOUT = 'payout',
+  FINAL = 'final',
+  SUCCESS = 'success'
 }
 
 export type PayoutType = 'card' | 'trc20';
 
-// Global type definition for Telegram WebApp
 declare global {
   interface Window {
     Telegram?: {
