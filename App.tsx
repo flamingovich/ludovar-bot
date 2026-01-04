@@ -60,7 +60,6 @@ const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile>({ payoutValue: '', payoutType: 'card', isReferralVerified: false, participationCount: 0, totalWon: 0 });
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [usdRate, setUsdRate] = useState<number>(0.0105);
 
   const [globalProfiles, setGlobalProfiles] = useState<any[]>([]);
@@ -103,7 +102,7 @@ const App: React.FC = () => {
       const res = await fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } });
       const data = await res.json();
       if (data.result) setContests(JSON.parse(data.result));
-    } catch (e) { setError("Ошибка сети"); } finally { setIsLoading(false); }
+    } catch (e) { console.error("Ошибка сети"); } finally { setIsLoading(false); }
   };
 
   const fetchBotsAndProfiles = async () => {
@@ -249,7 +248,7 @@ const App: React.FC = () => {
 
       saveProfile({ ...profile, participationCount: (profile.participationCount || 0) + 1 });
       fetchContests(); fetchBotsAndProfiles();
-    } catch (e) { setError("Ошибка регистрации"); }
+    } catch (e) { console.error("Ошибка регистрации"); }
   };
 
   const showPublicProfile = (name: string, isBot: boolean) => {
@@ -273,166 +272,91 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-dark text-[#E2E2E6] overflow-hidden flex flex-col select-none relative">
+    <div className="h-screen bg-matte-black text-[#E2E2E6] overflow-hidden flex flex-col select-none relative font-sans">
       
-      {/* Улучшенный фон с градиентами */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-         <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[50%] bg-gold/5 blur-[100px] rounded-full animate-pulse"></div>
-         <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[60%] bg-vivid-orange/5 blur-[140px] rounded-full animate-pulse" style={{ animationDelay: '2.5s' }}></div>
-         <div className="absolute inset-0 opacity-[0.04] mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }}></div>
+      {/* Тонкий профессиональный фон */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+         <div className="absolute top-0 left-0 w-full h-full opacity-10" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23C5A059' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
+         <div className="absolute top-[20%] left-[-10%] w-[50%] h-[40%] bg-gold/5 blur-[80px] rounded-full"></div>
+         <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-gold/5 blur-[80px] rounded-full"></div>
       </div>
-
-      {/* Модалка профиля */}
-      {viewedProfile && (
-        <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
-          <div className="bg-dark-card w-full max-w-[280px] rounded-[2.5rem] p-8 border border-dark-border shadow-gold-glow relative">
-            <button onClick={() => setViewedProfile(null)} className="absolute top-6 right-6 text-gold active:scale-90 transition-all"><XMarkIcon className="w-5 h-5"/></button>
-            <div className="flex flex-col items-center gap-4 mb-8">
-              <div className="w-16 h-16 bg-gold/10 rounded-full flex items-center justify-center border border-gold/20 shadow-gold-glow"><UserCircleIcon className="w-10 h-10 text-gold"/></div>
-              <h3 className="text-lg font-black gold-gradient-text uppercase tracking-tight text-center">{viewedProfile.name}</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-dark p-4 rounded-2xl border border-dark-border text-center">
-                <p className="text-[7px] font-black uppercase text-gold opacity-50 mb-1">Участий</p>
-                <p className="text-sm font-black">{viewedProfile.participationCount || 0}</p>
-              </div>
-              <div className="bg-dark p-4 rounded-2xl border border-dark-border text-center">
-                <p className="text-[7px] font-black uppercase text-gold opacity-50 mb-1">Выигрыш</p>
-                <p className="text-sm font-black text-vivid-orange">{(viewedProfile.totalWon || 0).toLocaleString()} ₽</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Кнопка админа */}
       {isAdmin && !isPickingWinner && (
-        <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="fixed top-4 right-4 z-[60] p-3 bg-dark-card/90 border border-gold/30 rounded-2xl shadow-gold-glow active:scale-90 transition-all">
+        <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="fixed top-5 right-5 z-[60] p-3 bg-soft-gray border border-gold/20 rounded-xl shadow-md active:scale-95 transition-all">
           {view === 'admin' ? <ChevronLeftIcon className="w-5 h-5 text-gold"/> : <ShieldCheckIcon className="w-5 h-5 text-gold"/>}
         </button>
       )}
 
       {view === 'admin' ? (
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 z-10 pt-14">
-          <div className="bg-dark-card p-6 rounded-[2rem] border border-dark-border shadow-gold-glow space-y-4">
-            <h2 className="text-gold font-black uppercase tracking-widest text-[9px]">Управление Drops</h2>
-            <input placeholder="Название розыгрыша" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full p-4 bg-dark rounded-xl border border-dark-border text-xs text-gold outline-none" />
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 z-10 pt-16">
+          <div className="bg-soft-gray p-6 rounded-2xl border border-border-gray space-y-4">
+            <h2 className="text-gold font-bold uppercase tracking-widest text-[10px]">Управление Drops</h2>
+            <input placeholder="Название розыгрыша" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full p-3.5 bg-matte-black rounded-lg border border-border-gray text-sm text-gold outline-none focus:border-gold/30 transition-all" />
             <div className="grid grid-cols-2 gap-4">
-              <input type="number" placeholder="Приз (₽)" value={newPrizeRub} onChange={e => setNewPrizeRub(e.target.value)} className="w-full p-4 bg-dark rounded-xl border border-dark-border text-xs text-gold outline-none" />
-              <input type="number" placeholder="Мест" value={newWinnerCount} onChange={e => setNewWinnerCount(parseInt(e.target.value))} className="w-full p-4 bg-dark rounded-xl border border-dark-border text-xs text-gold outline-none" />
+              <input type="number" placeholder="Банк (₽)" value={newPrizeRub} onChange={e => setNewPrizeRub(e.target.value)} className="w-full p-3.5 bg-matte-black rounded-lg border border-border-gray text-sm text-gold outline-none" />
+              <input type="number" placeholder="Мест" value={newWinnerCount} onChange={e => setNewWinnerCount(parseInt(e.target.value))} className="w-full p-3.5 bg-matte-black rounded-lg border border-border-gray text-sm text-gold outline-none" />
             </div>
-            <button onClick={createContest} className="w-full py-4 bg-gold text-dark rounded-xl font-black uppercase tracking-widest text-xs shadow-gold-glow">Опубликовать</button>
+            <button onClick={createContest} className="w-full py-3.5 bg-gold text-matte-black rounded-lg font-bold uppercase tracking-widest text-xs active:bg-gold-light">Создать тираж</button>
           </div>
 
-          <div className="space-y-4 pb-28">
+          <div className="space-y-3 pb-24">
             {contests.map(c => (
-              <div key={c.id} className="bg-dark-card/40 border border-dark-border p-5 rounded-[2rem] flex justify-between items-center">
-                <div className="overflow-hidden pr-4">
-                  <p className="font-bold text-gold text-xs truncate uppercase tracking-tight">{c.title}</p>
-                  <p className="text-[9px] opacity-40 uppercase font-black">{c.prizeRub.toLocaleString()} ₽ • {c.winnerCount} мест</p>
+              <div key={c.id} className="bg-soft-gray/60 border border-border-gray p-4 rounded-xl flex justify-between items-center">
+                <div className="overflow-hidden">
+                  <p className="font-semibold text-white text-xs truncate uppercase tracking-tight">{c.title}</p>
+                  <p className="text-[9px] opacity-40 uppercase font-medium">{c.prizeRub.toLocaleString()} ₽ • {c.winnerCount} мест</p>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  {/* Fixed: Removed non-existent fetchParticipantsForAdmin call */}
-                  <button onClick={() => { setAdminSelectedContest(c); }} className="p-2.5 bg-dark border border-dark-border rounded-xl text-gold"><UsersIcon className="w-4 h-4"/></button>
-                  <button onClick={() => saveContestsGlobal(contests.filter(i => i.id !== c.id))} className="p-2.5 bg-dark border border-dark-border rounded-xl text-red-500"><TrashIcon className="w-4 h-4"/></button>
-                  {!c.isCompleted && <button onClick={() => drawWinners(c.id)} className="p-2.5 bg-dark border border-gold/40 rounded-xl text-green-500"><TrophyIcon className="w-4 h-4"/></button>}
+                <div className="flex gap-2 ml-4">
+                  <button onClick={() => saveContestsGlobal(contests.filter(i => i.id !== c.id))} className="p-2 bg-matte-black border border-border-gray rounded-lg text-red-500/50"><TrashIcon className="w-4 h-4"/></button>
+                  {!c.isCompleted && <button onClick={() => drawWinners(c.id)} className="p-2 bg-matte-black border border-gold/30 rounded-lg text-green-500"><TrophyIcon className="w-4 h-4"/></button>}
                 </div>
               </div>
             ))}
           </div>
-
-          {adminSelectedContest && (
-            <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
-              <div className="bg-dark-card w-full max-w-[400px] rounded-[2.5rem] p-6 border border-gold/20 shadow-gold-glow max-h-[80vh] overflow-y-auto flex flex-col">
-                <div className="flex justify-between items-center mb-6">
-                   <h2 className="text-sm font-black text-gold uppercase tracking-tighter">{adminSelectedContest.title}</h2>
-                   <button onClick={() => setAdminSelectedContest(null)} className="text-gold p-1"><XMarkIcon className="w-5 h-5"/></button>
-                </div>
-                {adminSelectedContest.winners?.map((w, i) => {
-                  const card = getCardType(w.payoutValue);
-                  return (
-                    <div key={i} className="p-4 bg-dark border border-dark-border rounded-2xl mb-3">
-                      <div className="flex justify-between items-center mb-2">
-                         <div className="flex items-center gap-2">
-                            <p className="text-gold font-bold text-xs">{w.name}</p>
-                            {card && <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full border border-current ${card.color}`}>{card.label}</span>}
-                         </div>
-                         <p className="text-green-500 font-black text-xs">+{w.prizeWon.toLocaleString()} ₽</p>
-                      </div>
-                      <div className="flex items-center justify-between opacity-50 text-[10px] bg-dark-card p-2 rounded-lg border border-dark-border/30">
-                         <span className="font-mono">{w.payoutValue}</span>
-                         <button onClick={() => copyToClipboard(w.payoutValue, `admin-win-${i}`)} className="text-gold">
-                           {copiedId === `admin-win-${i}` ? <ClipboardDocumentCheckIcon className="w-4 h-4"/> : <ClipboardIcon className="w-4 h-4"/>}
-                         </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden z-10">
           
-          <div className="px-8 pt-8 pb-4 flex items-baseline gap-3">
-            <h1 className="text-3xl font-black gold-gradient-text tracking-tighter uppercase italic drop-shadow-glow">LUDOVAR</h1>
-            <span className="text-[8px] font-black opacity-20 tracking-widest uppercase">VIP ACCESS</span>
+          <div className="px-8 pt-8 pb-4 flex items-baseline justify-between">
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-2xl font-extrabold text-white tracking-tighter uppercase italic">LUDOVAR</h1>
+              <span className="text-[8px] font-bold text-gold opacity-50 tracking-widest uppercase">Member Edition</span>
+            </div>
+            <div className="w-8 h-8 rounded-full border border-gold/20 flex items-center justify-center bg-soft-gray">
+              <ShieldCheckIcon className="w-4 h-4 text-gold"/>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-28 no-scrollbar">
+          <div className="flex-1 overflow-y-auto px-5 pb-24 no-scrollbar">
             {activeTab === 'contests' && (
-              <div className="space-y-5 animate-fade-in py-2">
+              <div className="space-y-4 animate-fade-in py-2">
                 {isLoading ? (
-                  <div className="flex flex-col items-center py-24 gap-4 opacity-20"><ClockIcon className="w-12 h-12 animate-spin text-gold"/></div>
+                  <div className="flex flex-col items-center py-20 opacity-20"><ClockIcon className="w-10 h-10 animate-spin text-gold"/></div>
                 ) : contests.length === 0 ? (
-                  <div className="text-center py-32 opacity-20 uppercase font-black tracking-widest text-[10px]">Розыгрышей пока нет</div>
+                  <div className="text-center py-32 opacity-20 uppercase font-bold tracking-[0.2em] text-[10px]">Нет активных событий</div>
                 ) : contests.map(c => {
                   const joined = participatedIds.includes(c.id);
                   const perPerson = Math.floor(c.prizeRub / c.winnerCount);
-                  const perPersonUsd = (perPerson * usdRate).toFixed(1);
                   return (
-                    <div key={c.id} onClick={() => handleStartContest(c)} className="relative bg-dark-card/60 backdrop-blur-sm p-6 rounded-[2.2rem] border border-dark-border shadow-lg active:scale-[0.98] transition-all group overflow-hidden">
+                    <div key={c.id} onClick={() => handleStartContest(c)} className="relative bg-soft-gray border border-border-gray p-6 rounded-2xl shadow-lg active:scale-[0.99] transition-all group overflow-hidden">
                       {c.isCompleted ? (
-                        <div className="absolute top-4 right-6 px-3 py-1 bg-dark/50 rounded-full border border-dark-border text-[7px] font-black uppercase text-gold/30 italic">Завершен</div>
+                        <div className="absolute top-4 right-6 px-2.5 py-0.5 bg-deep-gray rounded border border-border-gray text-[7px] font-bold uppercase text-white/30">Завершен</div>
                       ) : joined ? (
-                        <div className="absolute top-4 right-6 px-3 py-1 bg-gold/10 rounded-full border border-gold/30 text-[7px] font-black uppercase text-gold animate-pulse">Участвую</div>
+                        <div className="absolute top-4 right-6 px-2.5 py-0.5 bg-gold/10 rounded border border-gold/30 text-[7px] font-bold uppercase text-gold">Участвую</div>
                       ) : null}
                       
-                      <h3 className="text-lg font-black text-white mb-6 tracking-tight pr-16 uppercase italic leading-tight">{c.title}</h3>
+                      <h3 className="text-base font-bold text-white mb-6 uppercase tracking-tight">{c.title}</h3>
                       
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] font-black uppercase opacity-20 tracking-widest">Призовой фонд</p>
-                          <div className="flex items-center gap-2">
-                            <BanknotesIcon className="w-3.5 h-3.5 text-vivid-orange"/>
-                            <p className="text-sm font-black text-white">{c.prizeRub.toLocaleString()} <span className="opacity-40 text-[9px]">₽</span></p>
-                          </div>
+                      <div className="grid grid-cols-2 gap-4 border-t border-border-gray pt-5">
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Банк</p>
+                          <p className="text-lg font-bold text-gold">{c.prizeRub.toLocaleString()} <span className="text-[10px]">₽</span></p>
                         </div>
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] font-black uppercase opacity-20 tracking-widest">Призовых мест</p>
-                          <div className="flex items-center gap-2">
-                            <UsersIcon className="w-3.5 h-3.5 text-gold"/>
-                            <p className="text-sm font-black text-white">{c.winnerCount}</p>
-                          </div>
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest">Доля победителя</p>
+                          <p className="text-lg font-bold text-white">{perPerson.toLocaleString()} <span className="text-[10px] opacity-40">₽</span></p>
                         </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-dark-border/40 flex items-center justify-between">
-                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center border border-dark-border"><StarIcon className="w-5 h-5 text-gold drop-shadow-glow"/></div>
-                            <div>
-                               <p className="text-[7px] font-black uppercase text-gold/60 tracking-widest">Приз на человека:</p>
-                               <div className="flex items-baseline gap-1.5">
-                                  <p className="text-sm font-black text-vivid-orange italic">{perPerson.toLocaleString()} ₽</p>
-                                  <span className="text-[8px] opacity-25 font-black">$ {perPersonUsd}</span>
-                               </div>
-                            </div>
-                         </div>
-                         <div className="flex items-center gap-1.5 opacity-10">
-                            <UsersIcon className="w-3 h-3"/>
-                            <span className="text-[10px] font-black">{c.participantCount}</span>
-                         </div>
                       </div>
                     </div>
                   );
@@ -442,86 +366,77 @@ const App: React.FC = () => {
 
             {activeTab === 'rating' && (
               <div className="py-2 space-y-6 animate-fade-in">
-                <div className="bg-dark-card border border-gold/10 p-8 rounded-[2.5rem] shadow-gold-glow text-center space-y-3 relative overflow-hidden">
-                   <div className="absolute inset-0 bg-gold/5 blur-3xl rounded-full"></div>
-                   <TrophyIcon className="w-16 h-16 text-gold mx-auto mb-1 opacity-80 drop-shadow-glow animate-bounce"/>
-                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gold opacity-40 italic">Выплачено всего</p>
-                   <p className="text-4xl font-black text-white italic tracking-tighter">
-                      {globalProfiles.reduce((acc, p) => acc + (p.totalWon || 0), 0).toLocaleString()} <span className="text-xl text-gold opacity-30 ml-0.5 font-sans">₽</span>
+                <div className="bg-soft-gray border border-border-gray p-8 rounded-2xl text-center shadow-md">
+                   <TrophyIcon className="w-12 h-12 text-gold/60 mx-auto mb-2"/>
+                   <p className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-1">Всего распределено</p>
+                   <p className="text-3xl font-bold text-white">
+                      {globalProfiles.reduce((acc, p) => acc + (p.totalWon || 0), 0).toLocaleString()} <span className="text-gold text-lg ml-0.5">₽</span>
                    </p>
                 </div>
 
-                <div className="space-y-3">
-                   {topRating.length > 0 ? topRating.map((p, i) => (
-                     <div key={p.name} onClick={() => showPublicProfile(p.name, true)} className="bg-dark-card/40 backdrop-blur-sm p-4 rounded-[1.8rem] border border-dark-border flex items-center gap-4 active:scale-[0.98] transition-all shadow-sm">
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-lg italic ${
-                          i === 0 ? 'bg-gold text-dark shadow-gold-glow' : 
-                          i === 1 ? 'bg-slate-400 text-dark' : 
-                          i === 2 ? 'bg-[#CD7F32] text-white' : 'bg-dark border border-dark-border text-gold/30'
+                <div className="space-y-2">
+                   {topRating.map((p, i) => (
+                     <div key={p.name} onClick={() => showPublicProfile(p.name, true)} className="bg-soft-gray/40 border border-border-gray p-4 rounded-xl flex items-center gap-4 active:bg-soft-gray/60 transition-all">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
+                          i === 0 ? 'bg-gold text-matte-black shadow-md' : 'bg-matte-black text-white/40 border border-border-gray'
                         }`}>
                           {i + 1}
                         </div>
                         <div className="flex-1 overflow-hidden">
-                          <p className="font-black text-sm uppercase tracking-tight italic truncate">{p.name}</p>
-                          <p className="text-[8px] font-black text-gold/40 uppercase tracking-widest">{p.participationCount || 0} участий</p>
+                          <p className="font-bold text-xs uppercase tracking-tight truncate text-white">{p.name}</p>
+                          <p className="text-[7px] font-bold text-white/30 uppercase tracking-widest">{p.participationCount || 0} участий</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-base font-black gold-gradient-text tracking-tighter italic drop-shadow-glow">{(p.totalWon || 0).toLocaleString()} ₽</p>
+                          <p className="text-sm font-bold text-gold">{(p.totalWon || 0).toLocaleString()} ₽</p>
                         </div>
                      </div>
-                   )) : (
-                     <div className="text-center py-20 opacity-20 uppercase font-black tracking-widest text-[9px]">Пустой рейтинг</div>
-                   )}
+                   ))}
                 </div>
               </div>
             )}
 
             {activeTab === 'profile' && (
-              <div className="py-4 space-y-8 animate-slide-up">
-                <div className="flex flex-col items-center gap-5 py-6">
-                   <div className="w-24 h-24 bg-dark-card rounded-3xl flex items-center justify-center border border-gold/20 shadow-gold-glow">
-                      <UserCircleIcon className="w-14 h-14 text-gold"/>
+              <div className="py-4 space-y-6 animate-slide-up">
+                <div className="flex items-center gap-5 p-6 bg-soft-gray rounded-2xl border border-border-gray">
+                   <div className="w-14 h-14 bg-matte-black rounded-xl flex items-center justify-center border border-border-gray">
+                      <UserCircleIcon className="w-8 h-8 text-gold"/>
                    </div>
-                   <div className="text-center">
-                      <h2 className="text-2xl font-black uppercase tracking-tighter italic gold-gradient-text">{user?.first_name || "УЧАСТНИК"}</h2>
-                      <p className="text-[9px] font-black opacity-20 uppercase tracking-[0.3em] mt-1 italic">Private Profile</p>
+                   <div>
+                      <h2 className="text-lg font-bold uppercase text-white tracking-tight">{user?.first_name || "Клиент"}</h2>
+                      <p className="text-[8px] font-bold text-gold/50 uppercase tracking-widest">Private Member</p>
                    </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-dark-card/50 p-6 rounded-[2rem] border border-dark-border text-center backdrop-blur-sm shadow-inner">
-                    <p className="text-[8px] font-black uppercase text-gold opacity-30 mb-1 tracking-widest">Участия</p>
-                    <p className="text-2xl font-black italic tracking-tighter">{profile.participationCount || 0}</p>
+                  <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray text-center">
+                    <p className="text-[8px] font-bold uppercase text-white/30 mb-1 tracking-widest">Участия</p>
+                    <p className="text-xl font-bold text-white">{profile.participationCount || 0}</p>
                   </div>
-                  <div className="bg-dark-card/50 p-6 rounded-[2rem] border border-dark-border text-center backdrop-blur-sm shadow-inner">
-                    <p className="text-[8px] font-black uppercase text-gold opacity-30 mb-1 tracking-widest">Прибыль</p>
-                    <p className="text-2xl font-black italic tracking-tighter text-vivid-orange">0</p>
+                  <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray text-center">
+                    <p className="text-[8px] font-bold uppercase text-white/30 mb-1 tracking-widest">Доход</p>
+                    <p className="text-xl font-bold text-gold">{profile.totalWon || 0}</p>
                   </div>
                 </div>
 
-                <div className="bg-dark-card p-7 rounded-[2.5rem] border border-dark-border space-y-6">
-                   <div className="flex flex-col gap-3">
-                      <p className="text-[9px] font-black uppercase text-gold/50 tracking-widest ml-1">Статус Beef</p>
-                      <button onClick={() => { setIsChecking(true); setTimeout(() => { setIsChecking(false); saveProfile({...profile, isReferralVerified: true}); }, 1500); }} disabled={profile.isReferralVerified || isChecking} className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-3 transition-all ${profile.isReferralVerified ? 'bg-dark border border-green-500/30 text-green-500' : 'bg-gold text-dark active:scale-95 shadow-gold-glow'}`}>
-                         {isChecking ? <ClockIcon className="w-4 h-4 animate-spin"/> : profile.isReferralVerified ? <><CheckBadgeIcon className="w-4 h-4"/> Верифицирован</> : "Проверить привязку"}
+                <div className="bg-soft-gray p-6 rounded-2xl border border-border-gray space-y-5">
+                   <div className="space-y-2">
+                      <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest ml-1">Статус верификации</p>
+                      <button onClick={() => { setIsChecking(true); setTimeout(() => { setIsChecking(false); saveProfile({...profile, isReferralVerified: true}); }, 1500); }} disabled={profile.isReferralVerified || isChecking} className={`w-full py-3.5 rounded-lg text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${profile.isReferralVerified ? 'bg-matte-black border border-green-500/20 text-green-500' : 'bg-gold text-matte-black active:scale-95'}`}>
+                         {isChecking ? <ClockIcon className="w-4 h-4 animate-spin"/> : profile.isReferralVerified ? "Счёт подтвержден" : "Подключить аккаунт"}
                       </button>
                    </div>
-                   <div className="flex flex-col gap-3">
-                      <p className="text-[9px] font-black uppercase text-gold/50 tracking-widest ml-1">Данные для выплат</p>
+                   <div className="space-y-2">
+                      <p className="text-[8px] font-bold uppercase text-white/30 tracking-widest ml-1">Реквизиты</p>
                       <div className="relative">
-                         <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center">
-                            {getCardType(profile.payoutValue) ? (
-                               <span className={`text-[9px] font-black ${getCardType(profile.payoutValue)?.color}`}>{getCardType(profile.payoutValue)?.label}</span>
-                            ) : (
-                               <CreditCardIcon className="w-4 h-4 text-gold/20"/>
-                            )}
-                         </div>
                          <input 
-                            placeholder="Номер банковской карты" 
+                            placeholder="0000 0000 0000 0000" 
                             value={profile.payoutValue} 
                             onChange={e => saveProfile({...profile, payoutValue: formatCard(e.target.value)})} 
-                            className="w-full pl-16 pr-5 py-4 bg-dark border border-dark-border rounded-xl text-gold font-mono outline-none text-xs focus:border-gold/30 transition-all shadow-inner" 
+                            className="w-full px-4 py-3 bg-matte-black border border-border-gray rounded-lg text-gold font-mono outline-none text-xs focus:border-gold/30 transition-all shadow-inner" 
                          />
+                         <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            {getCardType(profile.payoutValue) && <span className={`text-[8px] font-bold uppercase ${getCardType(profile.payoutValue)?.color}`}>{getCardType(profile.payoutValue)?.label}</span>}
+                         </div>
                       </div>
                    </div>
                 </div>
@@ -529,140 +444,101 @@ const App: React.FC = () => {
             )}
           </div>
 
-          <nav className="fixed bottom-0 left-0 right-0 bg-dark/90 backdrop-blur-3xl border-t border-dark-border/40 p-5 pb-10 flex justify-around z-40">
-            <button onClick={() => setActiveTab('contests')} className={`flex flex-col items-center gap-2 transition-all ${activeTab === 'contests' ? 'text-gold scale-110' : 'opacity-20 hover:opacity-40'}`}>
-              <GiftIcon className="w-6 h-6 drop-shadow-glow"/>
-              <span className="text-[8px] font-black uppercase tracking-widest">Drops</span>
+          <nav className="fixed bottom-0 left-0 right-0 bg-matte-black/95 backdrop-blur-xl border-t border-border-gray p-4 pb-8 flex justify-around z-40">
+            <button onClick={() => setActiveTab('contests')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'contests' ? 'text-gold' : 'opacity-30'}`}>
+              <GiftIcon className="w-5 h-5"/>
+              <span className="text-[8px] font-bold uppercase tracking-widest">Розыгрыши</span>
             </button>
-            <button onClick={() => setActiveTab('rating')} className={`flex flex-col items-center gap-2 transition-all ${activeTab === 'rating' ? 'text-gold scale-110' : 'opacity-20 hover:opacity-40'}`}>
-              <ChartBarIcon className="w-6 h-6 drop-shadow-glow"/>
-              <span className="text-[8px] font-black uppercase tracking-widest">Рейтинг</span>
+            <button onClick={() => setActiveTab('rating')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'rating' ? 'text-gold' : 'opacity-30'}`}>
+              <ChartBarIcon className="w-5 h-5"/>
+              <span className="text-[8px] font-bold uppercase tracking-widest">Рейтинг</span>
             </button>
-            <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-2 transition-all ${activeTab === 'profile' ? 'text-gold scale-110' : 'opacity-20 hover:opacity-40'}`}>
-              <UserCircleIcon className="w-6 h-6 drop-shadow-glow"/>
-              <span className="text-[8px] font-black uppercase tracking-widest">Сейф</span>
+            <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'profile' ? 'text-gold' : 'opacity-30'}`}>
+              <UserCircleIcon className="w-5 h-5"/>
+              <span className="text-[8px] font-bold uppercase tracking-widest">Кабинет</span>
             </button>
           </nav>
         </div>
       )}
 
-      {/* Оверлеи шагов */}
+      {/* Модальные окна с фиксом верстки */}
       {step !== ContestStep.LIST && (
-         <div className="fixed inset-0 z-[110] bg-dark flex flex-col p-10 animate-slide-up relative">
-            <div className="absolute inset-0 pointer-events-none opacity-20">
-               <div className="absolute top-[15%] right-[-15%] w-[50%] h-[50%] bg-gold/10 blur-[100px] rounded-full"></div>
-            </div>
-            <button onClick={() => setStep(ContestStep.LIST)} className="absolute top-8 left-8 p-3 bg-dark-card border border-dark-border rounded-xl text-gold z-20 active:scale-90 transition-all"><ChevronLeftIcon className="w-5 h-5"/></button>
+         <div className="fixed inset-0 z-[110] bg-matte-black flex flex-col p-8 animate-slide-up">
+            <button onClick={() => setStep(ContestStep.LIST)} className="absolute top-6 left-6 p-2.5 bg-soft-gray border border-border-gray rounded-xl text-gold active:scale-90 z-20"><ChevronLeftIcon className="w-5 h-5"/></button>
             
-            <div className="flex-1 flex flex-col justify-center items-center text-center space-y-8 z-10 px-4">
+            <div className="flex-1 flex flex-col justify-center items-center text-center space-y-8 z-10">
                {step === ContestStep.REFERRAL && (
-                  <>
-                     <div className="relative mb-4">
-                        <div className="absolute inset-0 bg-gold/20 blur-3xl rounded-full scale-125"></div>
-                        <LinkIcon className="w-20 h-20 text-gold relative drop-shadow-glow opacity-80"/>
-                     </div>
-                     <div className="space-y-3">
-                        <h1 className="text-3xl font-black uppercase italic tracking-tighter">Доступ Ограничен</h1>
-                        <p className="text-[10px] opacity-40 px-6 max-w-xs leading-relaxed font-black uppercase tracking-widest">Для участия в тираже на {selectedContest?.prizeRub.toLocaleString()} ₽ верифицируйте аккаунт в Beef</p>
-                     </div>
-                     <a href={BEEF_LINK} target="_blank" className="w-full py-5 bg-gold text-dark rounded-2xl font-black uppercase tracking-widest text-xs shadow-gold-glow active:scale-95 transition-all">Привязать в Beef</a>
-                  </>
+                  <div className="flex flex-col items-center w-full max-w-[300px]">
+                     <LinkIcon className="w-16 h-16 text-gold/40 mb-6 flex-shrink-0"/>
+                     <h1 className="text-xl font-bold uppercase tracking-tight mb-2">Требуется доступ</h1>
+                     <p className="text-[10px] opacity-40 uppercase tracking-widest leading-loose mb-10">Верифицируйте аккаунт в Beef для участия в тираже на {selectedContest?.prizeRub.toLocaleString()} ₽</p>
+                     <a href={BEEF_LINK} target="_blank" className="w-full py-4 bg-gold text-matte-black rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-all">Открыть Beef</a>
+                  </div>
                )}
                {step === ContestStep.PAYOUT && (
-                  <div className="w-full max-w-[320px] space-y-10">
-                    <h1 className="text-3xl font-black uppercase italic tracking-tighter gold-gradient-text">Куда выплатим?</h1>
+                  <div className="w-full max-w-[300px] space-y-8">
+                    <h1 className="text-xl font-bold uppercase tracking-tight">Реквизиты</h1>
                     <div className="space-y-2">
-                       <p className="text-[8px] font-black text-gold/30 uppercase tracking-[0.3em]">Номер банковской карты</p>
-                       <input placeholder="0000 0000 0000 0000" value={profile.payoutValue} onChange={e => saveProfile({...profile, payoutValue: formatCard(e.target.value)})} className="w-full py-6 bg-dark-card border-2 border-dark-border rounded-3xl text-xl font-mono text-gold text-center outline-none focus:border-gold/40 shadow-gold-glow transition-all" />
+                       <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest">Карта для выплаты</p>
+                       <input placeholder="0000 0000 0000 0000" value={profile.payoutValue} onChange={e => saveProfile({...profile, payoutValue: formatCard(e.target.value)})} className="w-full py-4 bg-soft-gray border border-border-gray rounded-xl text-lg font-mono text-gold text-center outline-none focus:border-gold/40 transition-all shadow-inner" />
                     </div>
-                    <button onClick={() => setStep(ContestStep.FINAL)} disabled={profile.payoutValue.length < 16} className="w-full py-5 bg-gold text-dark rounded-2xl font-black uppercase tracking-widest text-xs shadow-gold-glow disabled:opacity-10 transition-all">Далее</button>
+                    <button onClick={() => setStep(ContestStep.FINAL)} disabled={profile.payoutValue.length < 16} className="w-full py-4 bg-gold text-matte-black rounded-xl font-bold uppercase tracking-widest text-[10px] disabled:opacity-20 transition-all">Продолжить</button>
                   </div>
                )}
                {step === ContestStep.FINAL && (
-                  <>
-                    <FlagIcon className="w-20 h-20 text-gold drop-shadow-glow animate-pulse mb-4"/>
-                    <h1 className="text-3xl font-black uppercase italic tracking-tighter">Завершение</h1>
-                    <div className="bg-dark-card p-6 rounded-[2rem] border border-dark-border w-full shadow-inner">
-                       <p className="text-[8px] font-black text-gold/30 uppercase tracking-[0.3em] mb-4 text-center">Выплата будет произведена на:</p>
-                       <div className="flex flex-col items-center gap-1.5">
-                          <p className="font-mono text-lg font-black text-gold tracking-widest">{profile.payoutValue}</p>
-                          {getCardType(profile.payoutValue) && <span className={`text-[8px] font-black uppercase ${getCardType(profile.payoutValue)?.color}`}>{getCardType(profile.payoutValue)?.label}</span>}
-                       </div>
+                  <div className="flex flex-col items-center w-full max-w-[300px]">
+                    <FlagIcon className="w-16 h-16 text-gold mb-6 flex-shrink-0"/>
+                    <h1 className="text-xl font-bold uppercase tracking-tight mb-6">Подтверждение</h1>
+                    <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray w-full mb-8">
+                       <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mb-3">Карта зачисления:</p>
+                       <p className="font-mono text-base font-bold text-gold">{profile.payoutValue}</p>
                     </div>
-                    <button onClick={() => { setIsFinalizing(true); setTimeout(() => { registerParticipant(selectedContest!.id, profile.payoutValue); setIsFinalizing(false); setParticipatedIds([...participatedIds, selectedContest!.id]); localStorage.setItem(PARTICIPATION_KEY, JSON.stringify([...participatedIds, selectedContest!.id])); setStep(ContestStep.SUCCESS); }, 2000); }} className="w-full py-6 bg-gold text-dark rounded-2xl font-black uppercase tracking-widest text-xs shadow-gold-glow active:scale-95 transition-all flex items-center justify-center gap-3">
-                       {isFinalizing ? <ClockIcon className="w-6 h-6 animate-spin"/> : "Подать заявку"}
+                    <button onClick={() => { setIsFinalizing(true); setTimeout(() => { registerParticipant(selectedContest!.id, profile.payoutValue); setIsFinalizing(false); setParticipatedIds([...participatedIds, selectedContest!.id]); localStorage.setItem(PARTICIPATION_KEY, JSON.stringify([...participatedIds, selectedContest!.id])); setStep(ContestStep.SUCCESS); }, 1500); }} className="w-full py-4 bg-gold text-matte-black rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all flex items-center justify-center gap-3">
+                       {isFinalizing ? <ClockIcon className="w-5 h-5 animate-spin"/> : "Участвовать"}
                     </button>
-                  </>
+                  </div>
                )}
                {step === ContestStep.SUCCESS && (
-                  <div className="space-y-10 w-full">
+                  <div className="flex flex-col items-center w-full max-w-[300px]">
                     {selectedContest?.isCompleted ? (
-                      <>
-                        <TrophyIcon className="w-20 h-20 text-gold mx-auto animate-bounce drop-shadow-glow"/>
-                        <h2 className="text-3xl font-black uppercase italic tracking-tighter gold-gradient-text">Итоги тиража</h2>
-                        <div className="space-y-3 no-scrollbar overflow-y-auto max-h-[40vh] p-2">
-                           {selectedContest.winners?.map((w, i) => {
-                             const card = getCardType(w.payoutValue);
-                             return (
-                               <div key={i} onClick={() => showPublicProfile(w.name, true)} className="p-5 bg-dark-card border border-gold/10 rounded-[2rem] text-left flex items-center justify-between shadow-gold-glow active:scale-[0.98] transition-all">
-                                 <div className="overflow-hidden pr-2">
-                                   <div className="flex items-center gap-2 mb-0.5">
-                                      <p className="font-black text-gold uppercase tracking-tight text-xs truncate">{w.name}</p>
-                                      {card && <span className={`text-[6px] font-black uppercase ${card.color}`}>{card.label}</span>}
-                                   </div>
-                                   <p className="text-green-500 font-black text-sm">+{w.prizeWon.toLocaleString()} ₽</p>
-                                 </div>
-                                 <button onClick={(e) => { e.stopPropagation(); copyToClipboard(w.payoutValue, `succ-win-${i}`); }} className="text-gold opacity-30 hover:opacity-100 transition-opacity p-1.5">
-                                    {copiedId === `succ-win-${i}` ? <ClipboardDocumentCheckIcon className="w-5 h-5"/> : <ClipboardIcon className="w-5 h-5"/>}
-                                 </button>
+                      <div className="w-full space-y-6">
+                        <TrophyIcon className="w-14 h-14 text-gold mx-auto mb-2 flex-shrink-0"/>
+                        <h2 className="text-xl font-bold uppercase tracking-tight">Итоги тиража</h2>
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+                           {selectedContest.winners?.map((w, i) => (
+                             <div key={i} className="p-4 bg-soft-gray border border-border-gray rounded-xl flex items-center justify-between">
+                               <div>
+                                 <p className="font-bold text-white uppercase text-[10px]">{w.name}</p>
+                                 <p className="text-green-500 font-bold text-xs">+{w.prizeWon.toLocaleString()} ₽</p>
                                </div>
-                             );
-                           })}
+                               <button onClick={() => copyToClipboard(w.payoutValue, `w-${i}`)} className="text-gold/30">
+                                  {copiedId === `w-${i}` ? <ClipboardDocumentCheckIcon className="w-5 h-5"/> : <ClipboardIcon className="w-5 h-5"/>}
+                               </button>
+                             </div>
+                           ))}
                         </div>
-                      </>
+                      </div>
                     ) : (
-                      <>
-                        <div className="w-32 h-32 bg-gold text-dark rounded-full flex items-center justify-center mx-auto shadow-gold-glow-strong border-[8px] border-dark"><CheckBadgeIcon className="w-20 h-20"/></div>
-                        <div className="space-y-4">
-                           <h2 className="text-3xl font-black uppercase italic tracking-tighter gold-gradient-text">Заявка принята</h2>
-                           <p className="text-[9px] opacity-40 font-black uppercase tracking-[0.2em] leading-relaxed max-w-[200px] mx-auto">Ваше участие зафиксировано в блокчейне.<br/>Результаты появятся в ленте Drops.</p>
-                        </div>
-                      </>
+                      <div className="flex flex-col items-center">
+                        <div className="w-24 h-24 bg-gold/10 text-gold rounded-full flex items-center justify-center border border-gold/20 mb-8 flex-shrink-0"><CheckBadgeIcon className="w-12 h-12"/></div>
+                        <h2 className="text-xl font-bold uppercase tracking-tight mb-3">Заявка принята</h2>
+                        <p className="text-[9px] opacity-40 font-bold uppercase tracking-widest leading-relaxed max-w-[220px]">Участие зафиксировано в системе.<br/>Ожидайте результатов в списке тиражей.</p>
+                      </div>
                     )}
                   </div>
                )}
             </div>
-            <div className="absolute bottom-10 left-0 right-0 text-center pointer-events-none opacity-20">
-               <p className="text-[10px] font-black uppercase tracking-widest">@ludovar_gift_bot</p>
-            </div>
+            <div className="mt-auto py-6 text-center opacity-10 font-bold uppercase tracking-[0.3em] text-[8px]">ludovar security service</div>
          </div>
-      )}
-
-      {/* Анимация выбора победителя */}
-      {isPickingWinner && (
-        <div className="fixed inset-0 z-[300] bg-dark flex flex-col items-center justify-center p-12 space-y-12">
-           <div className="relative">
-              <div className="absolute inset-0 bg-gold/40 blur-[80px] animate-pulse scale-150"></div>
-              <TrophyIcon className="w-32 h-32 text-gold relative animate-bounce drop-shadow-glow"/>
-           </div>
-           <div className="text-center space-y-8">
-              <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase gold-gradient-text">Выбор победителя</h2>
-              <div className="h-2.5 w-[240px] bg-dark-card rounded-full overflow-hidden border border-dark-border shadow-inner">
-                 <div className="h-full bg-gold animate-loading-progress shadow-gold-glow"></div>
-              </div>
-              <p className="text-[10px] font-black text-gold uppercase tracking-[0.4em] animate-pulse italic">{pickingStatus}</p>
-           </div>
-        </div>
       )}
 
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slide-up { from { opacity: 0; transform: translateY(60px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slide-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes loading-progress { 0% { width: 0%; } 100% { width: 100%; } }
-        .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
-        .animate-slide-up { animation: slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+        .animate-slide-up { animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .animate-loading-progress { animation: loading-progress 4s linear forwards; }
-        .drop-shadow-glow { filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.4)); }
       `}</style>
     </div>
   );
