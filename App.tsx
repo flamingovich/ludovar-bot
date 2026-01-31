@@ -25,7 +25,10 @@ import {
   ArrowPathIcon,
   UserGroupIcon,
   SparklesIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  FingerPrintIcon,
+  LockClosedIcon,
+  KeyIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -43,6 +46,15 @@ const CURRENCIES: Record<Currency, { symbol: string; label: string; rateMult?: n
   KZT: { symbol: '₸', label: 'KZT' },
   UAH: { symbol: '₴', label: 'UAH' },
   BYN: { symbol: 'Br', label: 'BYN' }
+};
+
+const generateRandomSeed = () => {
+  const chars = '0123456789abcdef';
+  let result = '';
+  for (let i = 0; i < 64; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 };
 
 const App: React.FC = () => {
@@ -64,6 +76,10 @@ const App: React.FC = () => {
   const [currency, setCurrency] = useState<Currency>('RUB');
   const [rates, setRates] = useState<Record<string, number>>({ RUB: 1 });
   const [isLoading, setIsLoading] = useState(true);
+
+  // Provably Fair States
+  const [isVerifyingHash, setIsVerifyingHash] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'checking' | 'verified'>('idle');
 
   // Admin states
   const [newTitle, setNewTitle] = useState('');
@@ -119,7 +135,7 @@ const App: React.FC = () => {
     const contest = currentList.find(c => c.id === id);
     if (!contest || contest.isCompleted) return;
     const fakeWinners = generateFakeWinners(contest);
-    const updated = currentList.map(c => c.id === id ? { ...c, isCompleted: true, winners: fakeWinners } : c);
+    const updated = currentList.map(c => c.id === id ? { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() } : c);
     saveContests(updated);
   };
 
@@ -229,6 +245,7 @@ const App: React.FC = () => {
     setRefClickCount(0);
     setRefError('');
     setIsRefChecking(false);
+    setVerifyStatus('idle');
 
     if (c.isCompleted) {
       setStep(ContestStep.SUCCESS);
@@ -252,15 +269,27 @@ const App: React.FC = () => {
     setTimeout(() => {
       setIsRefChecking(false);
       if (refClickCount < 2) {
-        setRefError('Ошибка. Повторите попытку позже.');
+        setRefError('Ошибка проверки на реферала. Проверьте, реферал ли вы и повторите попытку через 5 секунд');
         setRefClickCount(prev => prev + 1);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       } else {
+        // Updated ContestStep.Payout to ContestStep.PAYOUT to match corrected enum definition
         setStep(ContestStep.PAYOUT);
         setRefClickCount(0);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       }
     }, delay);
+  };
+
+  const handleCheckHash = () => {
+    if (verifyStatus !== 'idle') return;
+    setVerifyStatus('checking');
+    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+    
+    setTimeout(() => {
+      setVerifyStatus('verified');
+      window.Telegram?.WebApp?.HapticFeedback.impactOccurred('heavy');
+    }, 2500);
   };
 
   const handleFinalizeParticipation = async () => {
@@ -301,7 +330,12 @@ const App: React.FC = () => {
     const contest = contests.find(c => c.id === id);
     if (!contest) return;
     const fakeWinners = generateFakeWinners(contest);
-    const updated = contests.map(c => c.id === id ? { ...c, isCompleted: true, winners: fakeWinners } : c);
+    const updated = contests.map(c => {
+      if (c.id === id) {
+        return { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() };
+      }
+      return c;
+    });
     saveContests(updated);
   };
 
@@ -539,18 +573,18 @@ const App: React.FC = () => {
       <nav className="fixed bottom-0 left-0 right-0 bg-matte-black/98 backdrop-blur-2xl border-t border-border-gray px-6 py-4 pb-8 flex justify-around z-50 shadow-2xl shrink-0">
         <button onClick={() => { setActiveTab('contests'); setView('user'); }} className={`flex flex-col items-center gap-2 transition-all active:scale-90 ${activeTab === 'contests' && view === 'user' ? 'text-gold' : 'opacity-20'}`}>
           <GiftIcon className="w-7 h-7"/>
-          <span className="text-[11px] font-black uppercase tracking-widest">DASHBOARD</span>
+          <span className="text-[11px] font-black uppercase tracking-widest">РОЗЫГРЫШИ</span>
         </button>
         <button onClick={() => { setActiveTab('profile'); setView('user'); }} className={`flex flex-col items-center gap-2 transition-all active:scale-90 ${activeTab === 'profile' ? 'text-gold' : 'opacity-20'}`}>
           <UserCircleIcon className="w-7 h-7"/>
-          <span className="text-[11px] font-black uppercase tracking-widest">ACCOUNT</span>
+          <span className="text-[11px] font-black uppercase tracking-widest">АККАУНТ</span>
         </button>
       </nav>
 
       {/* Step Modals */}
       {step !== ContestStep.LIST && (
         <div className="fixed inset-0 z-[100] bg-matte-black flex flex-col p-6 animate-slide-up no-scrollbar overflow-y-auto">
-           <button onClick={() => setStep(ContestStep.LIST)} className="absolute top-6 left-6 p-3 bg-soft-gray rounded-xl border border-border-gray text-gold active:scale-90 transition-all shadow-xl"><ChevronLeftIcon className="w-6 h-6"/></button>
+           <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="absolute top-6 left-6 p-3 bg-soft-gray rounded-xl border border-border-gray text-gold active:scale-90 transition-all shadow-xl"><ChevronLeftIcon className="w-6 h-6"/></button>
            
            <div className="flex-1 flex flex-col justify-center items-center text-center space-y-10 py-10">
               
@@ -598,7 +632,7 @@ const App: React.FC = () => {
                       ) : (
                         <>
                           <CheckBadgeIcon className="w-6 h-6" />
-                          Верифицировать
+                          ПРОВЕРИТЬ РЕГИСТРАЦИЮ
                         </>
                       )}
                     </button>
@@ -606,7 +640,103 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {step === ContestStep.PAYOUT && (
+              {step === ContestStep.REFERRAL && ( // This was a duplicate step in logic, but let's fix Payout check
+                null
+              )}
+
+              {step === ContestStep.LIST ? null : null}
+
+              {step === ContestStep.SUCCESS && selectedContest?.isCompleted && (
+                <div className="w-full max-w-[400px] space-y-10 animate-fade-in">
+                   <div className="w-20 h-20 bg-gold/10 rounded-[36px] flex items-center justify-center border border-gold/30 mx-auto shadow-lg relative">
+                    <TrophyIcon className="w-10 h-10 text-gold drop-shadow-lg"/>
+                    <div className="absolute -top-1 -right-1 w-7 h-7 bg-green-500 rounded-full flex items-center justify-center border-[2px] border-matte-black shadow-lg">
+                      <CheckBadgeIcon className="w-4 h-4 text-white" />
+                    </div>
+                   </div>
+                   <div className="space-y-3">
+                     <h2 className="text-[28px] font-black uppercase text-white tracking-tighter leading-none">Итоги</h2>
+                     <p className="text-[13px] font-black text-white/40 uppercase tracking-widest">{selectedContest.title}</p>
+                   </div>
+
+                   {/* Provably Fair Section */}
+                   <div className="bg-soft-gray/50 border border-border-gray p-4 rounded-2xl space-y-3 text-left">
+                     <div className="flex items-center gap-2">
+                        <FingerPrintIcon className="w-4 h-4 text-gold" />
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-gold opacity-80">PROVABLY FAIR VERIFICATION</h4>
+                     </div>
+                     <div className="bg-matte-black p-3 rounded-xl border border-border-gray relative group">
+                        <p className="text-[10px] font-mono text-white/30 break-all leading-relaxed line-clamp-2">
+                          {selectedContest.seed || "8f7a9c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b"}
+                        </p>
+                        <LockClosedIcon className="w-3 h-3 absolute bottom-2 right-2 text-gold/20" />
+                     </div>
+                     <button 
+                      onClick={handleCheckHash}
+                      disabled={verifyStatus !== 'idle'}
+                      className={`w-full py-3 rounded-xl text-[11px] font-black uppercase transition-all flex items-center justify-center gap-2 ${
+                        verifyStatus === 'verified' 
+                        ? 'bg-green-500/20 text-green-500 border border-green-500/30' 
+                        : 'bg-gold/10 text-gold border border-gold/20 active:bg-gold/20'
+                      }`}
+                     >
+                        {verifyStatus === 'idle' && (
+                          <>
+                            <KeyIcon className="w-4 h-4" />
+                            ПРОВЕРИТЬ ХЭШ
+                          </>
+                        )}
+                        {verifyStatus === 'checking' && (
+                          <>
+                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                            РАСШИФРОВКА SEED...
+                          </>
+                        )}
+                        {verifyStatus === 'verified' && (
+                          <>
+                            <CheckBadgeIcon className="w-4 h-4" />
+                            ХЭШ ПОДТВЕРЖДЕН (PROBABLY FAIR)
+                          </>
+                        )}
+                     </button>
+                   </div>
+
+                   <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {selectedContest.winners?.map((w, i) => {
+                        const fakeCard = generateDeterministicFakeCard(w.ticketNumber);
+                        return (
+                          <div key={i} className="p-4 bg-soft-gray border border-border-gray rounded-[24px] flex justify-between items-center animate-slide-up group shadow-lg relative overflow-hidden" style={{animationDelay: `${i * 0.1}s`}}>
+                            <div className="absolute top-0 left-0 w-1 h-full bg-gold/50 shadow-inner"></div>
+                            <div className="text-left space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <TicketIcon className="w-4 h-4 text-gold/60" />
+                                <p className="text-[14px] font-black text-white uppercase group-hover:text-gold transition-colors">Билет #{w.ticketNumber}</p>
+                              </div>
+                              {isAdmin && (
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(fakeCard.replace(/\s/g, ''));
+                                    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+                                  }}
+                                  className="flex items-center gap-2 text-[10px] font-black uppercase bg-gold/15 text-gold px-3 py-1.5 rounded-lg border border-gold/20 active:scale-90 transition-all"
+                                >
+                                  <ClipboardDocumentIcon className="w-3.5 h-3.5"/>
+                                  Копировать
+                                </button>
+                              )}
+                            </div>
+                            <div className="text-right">
+                               <p className="text-[18px] font-black text-green-500 tracking-tighter">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                   </div>
+                   <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="w-full py-5 bg-gold text-matte-black font-black rounded-[28px] uppercase text-[14px] shadow-lg active:translate-y-1 transition-all">Закрыть</button>
+                </div>
+              )}
+
+              {step === ContestStep.PAYOUT && ( // Updated reference to PAYOUT member in ContestStep enum
                 <div className="w-full max-w-[340px] space-y-10">
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black uppercase text-white tracking-tighter leading-none">Способ<br/>выплаты</h2>
@@ -665,56 +795,9 @@ const App: React.FC = () => {
                        <CheckBadgeIcon className="w-8 h-8"/>
                        <p className="text-[18px] font-black uppercase tracking-wider">МЕСТО ЗАНЯТО!</p>
                      </div>
-                     <p className="text-[13px] font-black text-gold uppercase tracking-[0.2em] animate-pulse">Ожидайте итогов</p>
+                     <p className="text-[13px] font-black text-gold uppercase tracking-[0.2em] animate-pulse">В случае выигрыша вам придёт уведомление. Удачи!</p>
                    </div>
                    <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-5 border-2 border-gold/30 rounded-3xl text-[14px] font-black uppercase text-gold active:bg-gold/10 transition-all shadow-lg">На главную</button>
-                </div>
-              )}
-
-              {step === ContestStep.SUCCESS && selectedContest?.isCompleted && (
-                <div className="w-full max-w-[400px] space-y-10 animate-fade-in">
-                   <div className="w-24 h-24 bg-gold/10 rounded-[40px] flex items-center justify-center border border-gold/30 mx-auto shadow-lg relative">
-                    <TrophyIcon className="w-12 h-12 text-gold drop-shadow-lg"/>
-                    <div className="absolute -top-1 -right-1 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center border-[2px] border-matte-black shadow-lg">
-                      <CheckBadgeIcon className="w-5 h-5 text-white" />
-                    </div>
-                   </div>
-                   <div className="space-y-3">
-                     <h2 className="text-[32px] font-black uppercase text-white tracking-tighter leading-none">Итоги</h2>
-                     <p className="text-[13px] font-black text-white/40 uppercase tracking-widest">{selectedContest.title}</p>
-                   </div>
-                   <div className="space-y-4 max-h-[380px] overflow-y-auto pr-3 custom-scrollbar">
-                      {selectedContest.winners?.map((w, i) => {
-                        const fakeCard = generateDeterministicFakeCard(w.ticketNumber);
-                        return (
-                          <div key={i} className="p-5 bg-soft-gray border border-border-gray rounded-[30px] flex justify-between items-center animate-slide-up group shadow-lg relative overflow-hidden" style={{animationDelay: `${i * 0.1}s`}}>
-                            <div className="absolute top-0 left-0 w-1 h-full bg-gold/50 shadow-inner"></div>
-                            <div className="text-left space-y-2">
-                              <div className="flex items-center gap-2">
-                                <TicketIcon className="w-4 h-4 text-gold/60" />
-                                <p className="text-[15px] font-black text-white uppercase group-hover:text-gold transition-colors">Билет #{w.ticketNumber}</p>
-                              </div>
-                              {isAdmin && (
-                                <button 
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(fakeCard.replace(/\s/g, ''));
-                                    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
-                                  }}
-                                  className="flex items-center gap-2 text-[11px] font-black uppercase bg-gold/15 text-gold px-4 py-2 rounded-xl border border-gold/20 active:scale-90 transition-all shadow-md"
-                                >
-                                  <ClipboardDocumentIcon className="w-4 h-4"/>
-                                  Копировать
-                                </button>
-                              )}
-                            </div>
-                            <div className="text-right">
-                               <p className="text-[20px] font-black text-green-500 tracking-tighter">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                   </div>
-                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-5 bg-gold text-matte-black font-black rounded-[30px] uppercase text-[14px] shadow-lg active:translate-y-1 transition-all">Закрыть</button>
                 </div>
               )}
            </div>

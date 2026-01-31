@@ -42,6 +42,7 @@ export interface Contest {
   winners?: WinnerInfo[];
   winnerCount: number;
   lastTicketNumber: number;
+  seed?: string;
 }
 
 export enum ContestStep {
