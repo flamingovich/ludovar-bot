@@ -21,7 +21,8 @@ import {
   BanknotesIcon,
   ArrowTopRightOnSquareIcon,
   ClipboardDocumentIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -220,17 +221,21 @@ const App: React.FC = () => {
     setRefError('');
     setIsRefChecking(false);
 
+    // ВАЖНО: Если конкурс завершен, ВСЕГДА показываем SUCCESS (список победителей)
+    if (c.isCompleted) {
+      setStep(ContestStep.SUCCESS);
+      return;
+    }
+
+    // Если конкурс активен и юзер участвовал - показываем его билет
     if (profile.participatedContests[c.id]) {
       setUserTicket(profile.participatedContests[c.id]);
       setStep(ContestStep.TICKET_SHOW);
       return;
     }
 
-    if (c.isCompleted) {
-      setStep(ContestStep.SUCCESS);
-    } else {
-      setStep(ContestStep.REFERRAL);
-    }
+    // В противном случае - на проверку реферала
+    setStep(ContestStep.REFERRAL);
   };
 
   const handleRefCheck = () => {
@@ -238,7 +243,7 @@ const App: React.FC = () => {
     setIsRefChecking(true);
     setRefError('');
     
-    // 1-3 seconds
+    // 1-3 секунды
     const delay = Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000;
     
     setTimeout(() => {
@@ -297,7 +302,6 @@ const App: React.FC = () => {
     const contest = contests.find(c => c.id === id);
     if (!contest) return;
     const fakeWinners = generateFakeWinners(contest);
-    // Fix: Using correct loop variable 'c' instead of undefined 'i'
     const updated = contests.map(c => c.id === id ? { ...c, isCompleted: true, winners: fakeWinners } : c);
     saveContests(updated);
   };
@@ -308,51 +312,48 @@ const App: React.FC = () => {
       const t = setInterval(() => setTimeLeft(expiresAt - Date.now()), 1000);
       return () => clearInterval(t);
     }, [expiresAt]);
-    if (timeLeft <= 0) return <span className="text-red-500 font-bold uppercase text-[8px]">Завершен</span>;
+    if (timeLeft <= 0) return <span className="text-red-500 font-bold uppercase text-[10px]">Завершен</span>;
     const m = Math.floor(timeLeft / 60000);
     const s = Math.floor((timeLeft % 60000) / 1000);
-    return <span className="text-gold font-mono">{m}:{s < 10 ? '0' : ''}{s}</span>;
+    return <span className="text-gold font-mono text-[12px]">{m}:{s < 10 ? '0' : ''}{s}</span>;
   };
 
   return (
     <div className="h-screen bg-matte-black text-[#E2E2E6] overflow-hidden flex flex-col font-sans">
       
-      {/* Top Header with Stats */}
+      {/* Top Header */}
       <div className="p-4 bg-soft-gray border-b border-border-gray z-30 shadow-xl">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-[10px] font-black uppercase tracking-[0.1em] text-gold">РОЗЫГРЫШИ ОТ ЛУДОВАРА</h1>
+            <h1 className="text-[11px] font-black uppercase tracking-[0.1em] text-gold">РОЗЫГРЫШИ ОТ ЛУДОВАРА</h1>
             <div className="h-4 w-[1px] bg-border-gray mx-1"></div>
             
-            {/* Styled Currency Switcher */}
             <div className="relative inline-block">
               <select 
                 value={currency} 
                 onChange={e => setCurrency(e.target.value as Currency)}
-                className="appearance-none bg-matte-black border border-gold/20 rounded-lg px-2.5 py-1 text-[10px] font-bold text-white pr-7 outline-none active:border-gold transition-colors"
+                className="appearance-none bg-matte-black border border-gold/20 rounded-lg px-3 py-1.5 text-[11px] font-bold text-white pr-8 outline-none active:border-gold transition-colors"
               >
                 {Object.keys(CURRENCIES).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <ChevronDownIcon className="w-3 h-3 text-gold absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDownIcon className="w-3.5 h-3.5 text-gold absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
           {isAdmin && (
-            <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="p-2 bg-matte-black rounded-lg border border-gold/20">
-              <ShieldCheckIcon className="w-4 h-4 text-gold"/>
+            <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="p-2.5 bg-matte-black rounded-lg border border-gold/20">
+              <ShieldCheckIcon className="w-5 h-5 text-gold"/>
             </button>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-matte-black/40 p-3 rounded-xl border border-border-gray relative overflow-hidden group">
-             <div className="absolute inset-0 bg-gold/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-             <p className="text-[7px] font-bold uppercase opacity-30 tracking-[0.2em] mb-1">Всего разыграно</p>
-             <p className="text-xs font-black text-white">{convert(stats.total)} {CURRENCIES[currency].symbol}</p>
+          <div className="bg-matte-black/40 p-4 rounded-xl border border-border-gray">
+             <p className="text-[10px] font-bold uppercase opacity-30 tracking-[0.2em] mb-1">Всего разыграно</p>
+             <p className="text-sm font-black text-white">{convert(stats.total)} {CURRENCIES[currency].symbol}</p>
           </div>
-          <div className="bg-matte-black/40 p-3 rounded-xl border border-border-gray relative overflow-hidden group">
-             <div className="absolute inset-0 bg-gold/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-             <p className="text-[7px] font-bold uppercase opacity-30 tracking-[0.2em] mb-1">В этом месяце</p>
-             <p className="text-xs font-black text-gold">{convert(stats.thisMonth)} {CURRENCIES[currency].symbol}</p>
+          <div className="bg-matte-black/40 p-4 rounded-xl border border-border-gray">
+             <p className="text-[10px] font-bold uppercase opacity-30 tracking-[0.2em] mb-1">В этом месяце</p>
+             <p className="text-sm font-black text-gold">{convert(stats.thisMonth)} {CURRENCIES[currency].symbol}</p>
           </div>
         </div>
       </div>
@@ -360,213 +361,169 @@ const App: React.FC = () => {
       <div className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar relative">
         {view === 'admin' ? (
           <div className="space-y-6 pb-24">
-             <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray space-y-4">
-                <h3 className="text-[10px] font-bold uppercase text-gold">Новый розыгрыш</h3>
-                <div className="space-y-3">
-                  <input placeholder="Название розыгрыша" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full bg-matte-black p-4 rounded-xl border border-border-gray text-xs text-white outline-none focus:border-gold/50 transition-all"/>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="number" placeholder="Приз (RUB)" value={newPrize} onChange={e => setNewPrize(e.target.value)} className="bg-matte-black p-4 rounded-xl border border-border-gray text-xs text-white outline-none focus:border-gold/50 transition-all"/>
-                    <input type="number" placeholder="Победителей" value={newWinners} onChange={e => setNewWinners(e.target.value)} className="bg-matte-black p-4 rounded-xl border border-border-gray text-xs text-white outline-none focus:border-gold/50 transition-all"/>
+             <div className="bg-soft-gray p-6 rounded-2xl border border-border-gray space-y-5">
+                <h3 className="text-[12px] font-bold uppercase text-gold">Новый розыгрыш</h3>
+                <div className="space-y-4">
+                  <input placeholder="Название розыгрыша" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full bg-matte-black p-4 rounded-xl border border-border-gray text-sm text-white outline-none focus:border-gold/50 transition-all"/>
+                  <div className="grid grid-cols-2 gap-4">
+                    <input type="number" placeholder="Приз (RUB)" value={newPrize} onChange={e => setNewPrize(e.target.value)} className="bg-matte-black p-4 rounded-xl border border-border-gray text-sm text-white outline-none focus:border-gold/50 transition-all"/>
+                    <input type="number" placeholder="Победителей" value={newWinners} onChange={e => setNewWinners(e.target.value)} className="bg-matte-black p-4 rounded-xl border border-border-gray text-sm text-white outline-none focus:border-gold/50 transition-all"/>
                   </div>
-                  <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="w-full bg-matte-black p-4 rounded-xl border border-border-gray text-xs text-gold outline-none">
+                  <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="w-full bg-matte-black p-4 rounded-xl border border-border-gray text-sm text-gold outline-none">
                     <option value="">Выберите пресет казино</option>
                     {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
-                  <select value={newDuration} onChange={e => setNewDuration(e.target.value)} className="w-full bg-matte-black p-4 rounded-xl border border-border-gray text-xs text-white/50 outline-none">
-                    <option value="300000">5 минут</option>
-                    <option value="600000">10 минут</option>
-                    <option value="1800000">30 минут</option>
-                    <option value="3600000">1 час</option>
-                    <option value="10800000">3 часа</option>
-                    <option value="21600000">6 часов</option>
-                    <option value="43200000">12 часов</option>
-                    <option value="86400000">24 часа</option>
-                    <option value="">Вручную</option>
-                  </select>
                 </div>
-                <button onClick={handleCreateContest} className="w-full py-4 bg-gold text-matte-black font-black rounded-xl uppercase text-[10px] active:scale-95 transition-all">Опубликовать</button>
+                <button onClick={handleCreateContest} className="w-full py-5 bg-gold text-matte-black font-black rounded-xl uppercase text-[11px] active:scale-95 transition-all">Опубликовать</button>
              </div>
 
-             <div className="bg-soft-gray p-5 rounded-2xl border border-border-gray space-y-4">
+             <div className="bg-soft-gray p-6 rounded-2xl border border-border-gray space-y-5">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-[10px] font-bold uppercase text-gold">Управление пресетами</h3>
+                  <h3 className="text-[12px] font-bold uppercase text-gold">Управление пресетами</h3>
                   <button onClick={() => {
                     const name = prompt('Название казино:');
                     const link = prompt('Ссылка регистрации:');
                     if(name && link) savePresets([...presets, { id: Date.now().toString(), name, referralLink: link }]);
-                  }} className="p-2 bg-gold/10 rounded-lg border border-gold/20"><PlusIcon className="w-4 h-4 text-gold"/></button>
+                  }} className="p-2.5 bg-gold/10 rounded-lg border border-gold/20"><PlusIcon className="w-5 h-5 text-gold"/></button>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {presets.map(p => (
                     <div key={p.id} className="p-4 bg-matte-black rounded-xl border border-border-gray flex justify-between items-center group">
                       <div className="overflow-hidden">
-                        <p className="text-[10px] font-bold text-white uppercase truncate">{p.name}</p>
-                        <p className="text-[8px] opacity-30 truncate w-40">{p.referralLink}</p>
+                        <p className="text-[11px] font-bold text-white uppercase truncate">{p.name}</p>
+                        <p className="text-[9px] opacity-30 truncate w-40">{p.referralLink}</p>
                       </div>
-                      <button onClick={() => savePresets(presets.filter(i => i.id !== p.id))} className="text-red-500 opacity-50 group-hover:opacity-100"><TrashIcon className="w-4 h-4"/></button>
+                      <button onClick={() => savePresets(presets.filter(i => i.id !== p.id))} className="text-red-500 opacity-50 group-hover:opacity-100"><TrashIcon className="w-5 h-5"/></button>
                     </div>
                   ))}
-                  {presets.length === 0 && <p className="text-center py-4 text-[9px] opacity-20 uppercase">Пресеты отсутствуют</p>}
                 </div>
              </div>
           </div>
         ) : (
-          <>
-            {activeTab === 'contests' && (
-              <div className="space-y-4 pb-24">
-                {contests.length === 0 && (
-                  <div className="flex flex-col items-center py-20 opacity-20">
-                    <GiftIcon className="w-12 h-12 mb-2"/>
-                    <p className="text-[10px] font-bold uppercase tracking-widest">Нет доступных розыгрышей</p>
-                  </div>
-                )}
-                {contests.map(c => {
-                  const isActive = !c.isCompleted && (c.expiresAt ? c.expiresAt > Date.now() : true);
-                  return (
-                    <div 
-                      key={c.id} 
-                      onClick={() => handleStartContest(c)}
-                      className={`relative p-6 rounded-3xl border transition-all active:scale-[0.98] group overflow-hidden ${
-                        isActive 
-                        ? 'bg-soft-gray border-gold/40 shadow-[0_0_25px_rgba(197,160,89,0.08)] ring-1 ring-gold/10' 
-                        : 'bg-soft-gray/50 border-border-gray opacity-60'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-6">
-                        <h2 className="text-base font-black text-white uppercase tracking-tight leading-tight pr-10">{c.title}</h2>
-                        {isActive ? (
-                          <div className="px-2 py-1 bg-green-500/10 rounded-lg border border-green-500/20 flex items-center gap-1.5 shrink-0">
-                            <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></div>
-                            <span className="text-[8px] font-black uppercase text-green-500">LIVE</span>
-                          </div>
-                        ) : (
-                          <div className="px-2 py-1 bg-white/5 rounded-lg border border-white/10 shrink-0">
-                            <span className="text-[8px] font-black uppercase text-white/30">ЗАВЕРШЕН</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-4 border-t border-border-gray pt-6">
-                        <div className="space-y-1">
-                          <p className="text-[7px] font-black uppercase opacity-20 tracking-widest">Банк</p>
-                          <p className="text-sm font-black text-gold">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
-                        </div>
-                        <div className="space-y-1 text-center">
-                          <p className="text-[7px] font-black uppercase opacity-20 tracking-widest">Мест</p>
-                          <p className="text-sm font-black text-white">{c.winnerCount}</p>
-                        </div>
-                        <div className="space-y-1 text-right">
-                          <p className="text-[7px] font-black uppercase opacity-20 tracking-widest">Билетов</p>
-                          <p className="text-sm font-black text-white">{c.participantCount}</p>
-                        </div>
-                      </div>
-
-                      {isActive && c.expiresAt && (
-                        <div className="mt-4 flex items-center gap-2 text-[9px] font-bold text-white/40 uppercase">
-                          <ClockIcon className="w-3.5 h-3.5 text-gold/60"/>
-                          До завершения: <Countdown expiresAt={c.expiresAt}/>
-                        </div>
-                      )}
-
-                      {isAdmin && !c.isCompleted && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); finishContestManually(c.id); }}
-                          className="mt-6 w-full py-3 bg-matte-black/50 border border-gold/20 rounded-xl text-[8px] font-bold uppercase text-gold hover:bg-gold/10 transition-colors"
-                        >Завершить вручную</button>
-                      )}
-                    </div>
-                  );
-                })}
+          <div className="space-y-5 pb-24">
+            {contests.length === 0 && (
+              <div className="flex flex-col items-center py-24 opacity-20">
+                <GiftIcon className="w-16 h-16 mb-4"/>
+                <p className="text-[12px] font-bold uppercase tracking-widest">Нет доступных розыгрышей</p>
               </div>
             )}
+            {contests.map(c => {
+              const isActive = !c.isCompleted && (c.expiresAt ? c.expiresAt > Date.now() : true);
+              return (
+                <div 
+                  key={c.id} 
+                  onClick={() => handleStartContest(c)}
+                  className={`relative p-7 rounded-3xl border transition-all active:scale-[0.98] group overflow-hidden ${
+                    isActive 
+                    ? 'bg-soft-gray border-gold/40 shadow-[0_0_30px_rgba(197,160,89,0.1)] ring-1 ring-gold/10' 
+                    : 'bg-soft-gray/50 border-border-gray opacity-70'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-6">
+                    <h2 className="text-[15px] font-black text-white uppercase tracking-tight leading-tight pr-10">{c.title}</h2>
+                    {isActive ? (
+                      <div className="px-3 py-1.5 bg-green-500/10 rounded-lg border border-green-500/20 flex items-center gap-2 shrink-0">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-[10px] font-black uppercase text-green-500">LIVE</span>
+                      </div>
+                    ) : (
+                      <div className="px-3 py-1.5 bg-white/5 rounded-lg border border-white/10 shrink-0">
+                        <span className="text-[10px] font-black uppercase text-white/30">ЗАВЕРШЕН</span>
+                      </div>
+                    )}
+                  </div>
 
-            {activeTab === 'profile' && (
-              <div className="space-y-6 pb-24 animate-slide-up">
-                <div className="flex items-center gap-5 p-7 bg-soft-gray rounded-3xl border border-border-gray shadow-2xl relative overflow-hidden">
-                  <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-gold/5 blur-3xl rounded-full"></div>
-                  {user?.photo_url ? (
-                    <img src={user.photo_url} className="w-16 h-16 rounded-2xl border-2 border-gold/20 shadow-xl" alt=""/>
-                  ) : (
-                    <div className="w-16 h-16 bg-matte-black rounded-2xl border border-border-gray flex items-center justify-center shadow-inner">
-                      <UserCircleIcon className="w-10 h-10 text-gold/20"/>
+                  <div className="grid grid-cols-3 gap-5 border-t border-border-gray pt-6">
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-black uppercase opacity-20 tracking-widest">Банк</p>
+                      <p className="text-[13px] font-black text-gold">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
+                    </div>
+                    <div className="space-y-1.5 text-center">
+                      <p className="text-[10px] font-black uppercase opacity-20 tracking-widest">Мест</p>
+                      <p className="text-[13px] font-black text-white">{c.winnerCount}</p>
+                    </div>
+                    <div className="space-y-1.5 text-right">
+                      <p className="text-[10px] font-black uppercase opacity-20 tracking-widest">Билетов</p>
+                      <p className="text-[13px] font-black text-white">{c.participantCount}</p>
+                    </div>
+                  </div>
+
+                  {isActive && c.expiresAt && (
+                    <div className="mt-5 flex items-center gap-2.5 text-[11px] font-bold text-white/40 uppercase">
+                      <ClockIcon className="w-4 h-4 text-gold/60"/>
+                      До завершения: <Countdown expiresAt={c.expiresAt}/>
                     </div>
                   )}
-                  <div>
-                    <h2 className="text-xl font-black text-white tracking-tight uppercase">{user?.first_name || 'Инкогнито'}</h2>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="p-6 bg-soft-gray rounded-3xl border border-border-gray text-center shadow-lg group">
-                      <p className="text-[8px] font-black uppercase opacity-20 mb-2 tracking-widest">Участий</p>
-                      <p className="text-2xl font-black text-white group-active:scale-110 transition-transform">{profile.participationCount}</p>
-                   </div>
-                   <div className="p-6 bg-soft-gray rounded-3xl border border-border-gray text-center shadow-lg group">
-                      <p className="text-[8px] font-black uppercase opacity-20 mb-2 tracking-widest">Выиграно</p>
-                      <p className="text-2xl font-black text-gold group-active:scale-110 transition-transform">{convert(profile.totalWon)} {CURRENCIES[currency].symbol}</p>
-                   </div>
+                  {isAdmin && !c.isCompleted && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); finishContestManually(c.id); }}
+                      className="mt-6 w-full py-4 bg-matte-black/50 border border-gold/20 rounded-xl text-[10px] font-bold uppercase text-gold hover:bg-gold/10 transition-colors"
+                    >Завершить вручную</button>
+                  )}
                 </div>
-              </div>
-            )}
-          </>
+              );
+            })}
+          </div>
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-matte-black/95 backdrop-blur-2xl border-t border-border-gray p-4 pb-10 flex justify-around z-50">
-        <button onClick={() => { setActiveTab('contests'); setView('user'); }} className={`flex flex-col items-center gap-2 transition-all ${activeTab === 'contests' && view === 'user' ? 'text-gold' : 'opacity-20'}`}>
-          <GiftIcon className="w-6 h-6"/>
-          <span className="text-[9px] font-black uppercase tracking-widest">РОЗЫГРЫШИ</span>
+      <nav className="fixed bottom-0 left-0 right-0 bg-matte-black/95 backdrop-blur-2xl border-t border-border-gray p-4 pb-12 flex justify-around z-50">
+        <button onClick={() => { setActiveTab('contests'); setView('user'); }} className={`flex flex-col items-center gap-2.5 transition-all ${activeTab === 'contests' && view === 'user' ? 'text-gold' : 'opacity-20'}`}>
+          <GiftIcon className="w-7 h-7"/>
+          <span className="text-[11px] font-black uppercase tracking-widest">РОЗЫГРЫШИ</span>
         </button>
-        <button onClick={() => { setActiveTab('profile'); setView('user'); }} className={`flex flex-col items-center gap-2 transition-all ${activeTab === 'profile' ? 'text-gold' : 'opacity-20'}`}>
-          <UserCircleIcon className="w-6 h-6"/>
-          <span className="text-[9px] font-black uppercase tracking-widest">ПРОФИЛЬ</span>
+        <button onClick={() => { setActiveTab('profile'); setView('user'); }} className={`flex flex-col items-center gap-2.5 transition-all ${activeTab === 'profile' ? 'text-gold' : 'opacity-20'}`}>
+          <UserCircleIcon className="w-7 h-7"/>
+          <span className="text-[11px] font-black uppercase tracking-widest">ПРОФИЛЬ</span>
         </button>
       </nav>
 
       {/* Step Modals */}
       {step !== ContestStep.LIST && (
         <div className="fixed inset-0 z-[100] bg-matte-black flex flex-col p-8 animate-slide-up no-scrollbar overflow-y-auto">
-           <button onClick={() => setStep(ContestStep.LIST)} className="absolute top-6 left-6 p-3 bg-soft-gray rounded-2xl border border-border-gray text-gold active:scale-90 transition-transform"><ChevronLeftIcon className="w-6 h-6"/></button>
+           <button onClick={() => setStep(ContestStep.LIST)} className="absolute top-8 left-8 p-3.5 bg-soft-gray rounded-2xl border border-border-gray text-gold active:scale-90 transition-transform"><ChevronLeftIcon className="w-7 h-7"/></button>
            
-           <div className="flex-1 flex flex-col justify-center items-center text-center space-y-10 py-10">
+           <div className="flex-1 flex flex-col justify-center items-center text-center space-y-12 py-10">
+              
               {step === ContestStep.REFERRAL && (
-                <div className="w-full max-w-[300px] space-y-8">
-                  <div className="w-20 h-20 bg-gold/10 rounded-[40px] flex items-center justify-center border border-gold/20 mx-auto shadow-2xl">
-                    <LinkIcon className="w-10 h-10 text-gold"/>
+                <div className="w-full max-w-[320px] space-y-10">
+                  <div className="w-24 h-24 bg-gold/10 rounded-[48px] flex items-center justify-center border border-gold/20 mx-auto shadow-2xl">
+                    <LinkIcon className="w-12 h-12 text-gold"/>
                   </div>
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-black uppercase tracking-tight text-white leading-tight">Проверка<br/>реферала</h2>
-                    <p className="text-[10px] uppercase font-bold opacity-30 tracking-[0.2em] px-6">Необходимо подтвердить регистрацию на проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
+                  <div className="space-y-3">
+                    <h2 className="text-3xl font-black uppercase tracking-tight text-white leading-tight">Проверка<br/>реферала</h2>
+                    <p className="text-[12px] uppercase font-bold opacity-30 tracking-[0.2em] px-6">Подтвердите регистрацию на проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
                   </div>
                   
                   {refError && (
-                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl animate-shake">
-                      <p className="text-[10px] font-bold text-red-500 uppercase leading-relaxed">{refError}</p>
+                    <div className="p-5 bg-red-500/10 border border-red-500/20 rounded-2xl animate-shake">
+                      <p className="text-[11px] font-bold text-red-500 uppercase leading-relaxed">{refError}</p>
                     </div>
                   )}
 
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <button 
                       onClick={() => {
                         const project = presets.find(p => p.id === selectedContest?.projectId);
                         if (project) window.open(project.referralLink, '_blank');
                       }}
-                      className="w-full py-4 bg-soft-gray text-gold border border-gold/20 font-black uppercase text-[11px] rounded-2xl flex items-center justify-center gap-2"
+                      className="w-full py-5 bg-soft-gray text-gold border border-gold/20 font-black uppercase text-[12px] rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all"
                     >
-                      <ArrowTopRightOnSquareIcon className="w-4 h-4"/>
+                      <ArrowTopRightOnSquareIcon className="w-5 h-5"/>
                       Перейти на {presets.find(p => p.id === selectedContest?.projectId)?.name}
                     </button>
 
                     <button 
                       onClick={handleRefCheck}
                       disabled={isRefChecking}
-                      className="w-full py-5 bg-gold text-matte-black font-black uppercase text-[12px] rounded-3xl shadow-[0_10px_30px_rgba(197,160,89,0.3)] active:translate-y-1 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      className="w-full py-6 bg-gold text-matte-black font-black uppercase text-[13px] rounded-3xl shadow-[0_12px_40px_rgba(197,160,89,0.3)] active:translate-y-1 transition-all flex items-center justify-center gap-4 disabled:opacity-50"
                     >
                       {isRefChecking ? (
                         <>
-                          <ClockIcon className="w-5 h-5 animate-spin"/>
-                          Проверка по базе...
+                          <ArrowPathIcon className="w-6 h-6 animate-spin"/>
+                          Идет проверка...
                         </>
                       ) : "Проверить регистрацию"}
                     </button>
@@ -575,21 +532,21 @@ const App: React.FC = () => {
               )}
 
               {step === ContestStep.PAYOUT && (
-                <div className="w-full max-w-[320px] space-y-8">
-                  <h2 className="text-2xl font-black uppercase text-white tracking-tighter">Реквизиты приза</h2>
+                <div className="w-full max-w-[340px] space-y-10">
+                  <h2 className="text-3xl font-black uppercase text-white tracking-tighter">Реквизиты приза</h2>
                   
-                  <div className="flex gap-3">
-                    <button onClick={() => setProfile({...profile, payoutType: 'card'})} className={`flex-1 py-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${profile.payoutType === 'card' ? 'bg-gold/10 border-gold text-gold' : 'bg-matte-black border-border-gray text-white/20'}`}>
-                      <CreditCardIcon className="w-6 h-6"/>
-                      <span className="text-[10px] font-black uppercase">Карта</span>
+                  <div className="flex gap-4">
+                    <button onClick={() => setProfile({...profile, payoutType: 'card'})} className={`flex-1 py-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${profile.payoutType === 'card' ? 'bg-gold/10 border-gold text-gold' : 'bg-matte-black border-border-gray text-white/20'}`}>
+                      <CreditCardIcon className="w-8 h-8"/>
+                      <span className="text-[11px] font-black uppercase">Карта</span>
                     </button>
-                    <button onClick={() => setProfile({...profile, payoutType: 'trc20'})} className={`flex-1 py-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${profile.payoutType === 'trc20' ? 'bg-gold/10 border-gold text-gold' : 'bg-matte-black border-border-gray text-white/20'}`}>
-                      <BanknotesIcon className="w-6 h-6"/>
-                      <span className="text-[10px] font-black uppercase">TRC-20</span>
+                    <button onClick={() => setProfile({...profile, payoutType: 'trc20'})} className={`flex-1 py-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${profile.payoutType === 'trc20' ? 'bg-gold/10 border-gold text-gold' : 'bg-matte-black border-border-gray text-white/20'}`}>
+                      <BanknotesIcon className="w-8 h-8"/>
+                      <span className="text-[11px] font-black uppercase">TRC-20</span>
                     </button>
                   </div>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-5">
                     <div className="relative group">
                       <input 
                         placeholder={profile.payoutType === 'card' ? "0000 0000 0000 0000" : "Адрес кошелька (TRC-20)"} 
@@ -598,100 +555,89 @@ const App: React.FC = () => {
                           const val = profile.payoutType === 'card' ? formatCard(e.target.value) : e.target.value;
                           setProfile({...profile, payoutValue: val});
                         }}
-                        className="w-full bg-soft-gray p-5 rounded-2xl border border-border-gray text-center font-mono text-gold outline-none focus:border-gold/50 shadow-inner"
+                        className="w-full bg-soft-gray p-6 rounded-2xl border border-border-gray text-center font-mono text-gold text-sm outline-none focus:border-gold/50 shadow-inner"
                       />
                       {profile.payoutType === 'card' && getCardType(profile.payoutValue) && (
-                        <div className="absolute top-1/2 -translate-y-1/2 right-4 pointer-events-none">
-                           <span className="text-[8px] font-black uppercase text-gold/40 border border-gold/20 px-1.5 py-0.5 rounded">{getCardType(profile.payoutValue)}</span>
+                        <div className="absolute top-1/2 -translate-y-1/2 right-5 pointer-events-none">
+                           <span className="text-[10px] font-black uppercase text-gold/40 border border-gold/20 px-2 py-0.5 rounded-md">{getCardType(profile.payoutValue)}</span>
                         </div>
                       )}
                     </div>
-
-                    {profile.savedPayouts.length > 0 && (
-                      <div className="space-y-3">
-                        <p className="text-[8px] font-black uppercase opacity-20 tracking-widest text-left ml-2">Быстрый выбор</p>
-                        <div className="flex flex-wrap gap-2">
-                          {profile.savedPayouts.map((s, i) => (
-                            <button key={i} onClick={() => setProfile({...profile, payoutValue: s.value, payoutType: s.type})} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-bold text-white/40 hover:text-gold transition-colors">{s.value.slice(0, 6)}...{s.value.slice(-4)}</button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   <button 
                     onClick={handleFinalizeParticipation}
                     disabled={!profile.payoutValue}
-                    className="w-full py-5 bg-gold text-matte-black font-black uppercase text-[12px] rounded-3xl shadow-[0_10px_30px_rgba(197,160,89,0.3)] disabled:opacity-20 active:translate-y-1 transition-all"
+                    className="w-full py-6 bg-gold text-matte-black font-black uppercase text-[14px] rounded-3xl shadow-[0_12px_40px_rgba(197,160,89,0.3)] disabled:opacity-20 active:translate-y-1 transition-all"
                   >Вступить в игру</button>
                 </div>
               )}
 
               {step === ContestStep.TICKET_SHOW && (
-                <div className="w-full max-w-[300px] space-y-12 animate-pop">
+                <div className="w-full max-w-[320px] space-y-14 animate-pop">
                    <div className="relative">
                       <div className="absolute inset-0 bg-gold/10 blur-[80px] rounded-full animate-pulse"></div>
-                      <div className="relative bg-soft-gray border-[3px] border-gold p-12 rounded-[50px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-gold/50 to-transparent"></div>
-                        <p className="text-[12px] font-black uppercase text-gold/60 tracking-[0.5em] mb-6">Ваш номер</p>
-                        <h1 className="text-7xl font-black text-white italic tracking-tighter drop-shadow-2xl">#{userTicket}</h1>
-                        <div className="mt-8 flex justify-center gap-1.5 opacity-30">
-                           {[...Array(7)].map((_, i) => <div key={i} className="w-1.5 h-1.5 bg-gold rounded-full"></div>)}
+                      <div className="relative bg-soft-gray border-[4px] border-gold p-14 rounded-[56px] shadow-[0_30px_70px_rgba(0,0,0,0.9)] overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-gold/50 to-transparent"></div>
+                        <p className="text-[14px] font-black uppercase text-gold/60 tracking-[0.5em] mb-8">Ваш номер</p>
+                        <h1 className="text-8xl font-black text-white italic tracking-tighter drop-shadow-2xl">#{userTicket}</h1>
+                        <div className="mt-10 flex justify-center gap-2 opacity-30">
+                           {[...Array(7)].map((_, i) => <div key={i} className="w-2 h-2 bg-gold rounded-full"></div>)}
                         </div>
                       </div>
                    </div>
-                   <div className="space-y-3">
-                     <div className="flex items-center justify-center gap-2 text-green-500">
-                       <CheckBadgeIcon className="w-5 h-5"/>
-                       <p className="text-sm font-black uppercase">Участие принято</p>
+                   <div className="space-y-4">
+                     <div className="flex items-center justify-center gap-2.5 text-green-500">
+                       <CheckBadgeIcon className="w-6 h-6"/>
+                       <p className="text-[13px] font-black uppercase">Участие принято</p>
                      </div>
-                     <p className="text-[11px] font-bold text-gold uppercase tracking-[0.2em] animate-pulse">В случае выигрыша вам придёт уведомление!</p>
+                     <p className="text-[12px] font-bold text-gold uppercase tracking-[0.2em] animate-pulse">В случае выигрыша вам придёт уведомление!</p>
                    </div>
-                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-5 border-2 border-gold/30 rounded-3xl text-[11px] font-black uppercase text-gold active:bg-gold/5 transition-all">Вернуться на главную</button>
+                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-6 border-2 border-gold/30 rounded-3xl text-[12px] font-black uppercase text-gold active:bg-gold/5 transition-all">Вернуться на главную</button>
                 </div>
               )}
 
               {step === ContestStep.SUCCESS && selectedContest?.isCompleted && (
-                <div className="w-full max-w-[340px] space-y-8 animate-fade-in">
-                   <div className="w-24 h-24 bg-gold/5 rounded-[45px] flex items-center justify-center border border-gold/20 mx-auto shadow-inner">
-                    <TrophyIcon className="w-12 h-12 text-gold"/>
+                <div className="w-full max-w-[360px] space-y-10 animate-fade-in">
+                   <div className="w-28 h-28 bg-gold/5 rounded-[50px] flex items-center justify-center border border-gold/20 mx-auto shadow-inner">
+                    <TrophyIcon className="w-14 h-14 text-gold"/>
                    </div>
-                   <div className="space-y-2">
-                     <h2 className="text-2xl font-black uppercase text-white tracking-tight">Итоги розыгрыша</h2>
-                     <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{selectedContest.title}</p>
+                   <div className="space-y-3">
+                     <h2 className="text-3xl font-black uppercase text-white tracking-tight">Итоги розыгрыша</h2>
+                     <p className="text-[12px] font-bold text-white/30 uppercase tracking-widest">{selectedContest.title}</p>
                    </div>
-                   <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">
                       {selectedContest.winners?.map((w, i) => {
                         const fakeCard = generateDeterministicFakeCard(w.ticketNumber);
                         return (
-                          <div key={i} className="p-5 bg-soft-gray border border-border-gray rounded-[24px] flex justify-between items-center animate-slide-up group" style={{animationDelay: `${i * 0.15}s`}}>
-                            <div className="text-left">
-                              <p className="text-[12px] font-black text-white uppercase group-active:text-gold transition-colors">Билет #{w.ticketNumber}</p>
-                              <p className="text-[9px] font-bold text-gold/40 uppercase tracking-widest">Победитель</p>
+                          <div key={i} className="p-6 bg-soft-gray border border-border-gray rounded-[28px] flex justify-between items-center animate-slide-up group shadow-xl" style={{animationDelay: `${i * 0.15}s`}}>
+                            <div className="text-left space-y-1">
+                              <p className="text-[14px] font-black text-white uppercase group-active:text-gold transition-colors">Билет #{w.ticketNumber}</p>
+                              <p className="text-[11px] font-bold text-gold/40 uppercase tracking-widest">Победитель</p>
                               {isAdmin && (
                                 <button 
                                   onClick={() => {
                                     navigator.clipboard.writeText(fakeCard.replace(/\s/g, ''));
                                     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
                                   }}
-                                  className="mt-2 flex items-center gap-1.5 text-[8px] font-black uppercase bg-gold/10 text-gold px-2 py-1 rounded border border-gold/20 active:scale-95 transition-transform"
+                                  className="mt-3 flex items-center gap-2 text-[10px] font-black uppercase bg-gold/10 text-gold px-3 py-2 rounded-xl border border-gold/20 active:scale-95 transition-transform"
                                 >
-                                  <ClipboardDocumentIcon className="w-3 h-3"/>
+                                  <ClipboardDocumentIcon className="w-4 h-4"/>
                                   Копировать карту
                                 </button>
                               )}
                             </div>
                             <div className="text-right">
-                               <p className="text-base font-black text-green-500">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p>
+                               <p className="text-lg font-black text-green-500">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p>
                             </div>
                           </div>
                         );
                       })}
                       {(!selectedContest.winners || selectedContest.winners.length === 0) && (
-                        <p className="text-center py-10 text-[10px] opacity-20 uppercase tracking-widest">Победители еще не определены</p>
+                        <p className="text-center py-12 text-[13px] opacity-30 uppercase tracking-widest font-bold">Победители еще не определены</p>
                       )}
                    </div>
-                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl uppercase text-[12px] shadow-xl">Закрыть</button>
+                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-6 bg-gold text-matte-black font-black rounded-3xl uppercase text-[13px] shadow-2xl active:translate-y-1 transition-all">Закрыть результаты</button>
                 </div>
               )}
            </div>
@@ -700,16 +646,16 @@ const App: React.FC = () => {
 
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slide-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
-        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
-        .animate-slide-up { animation: slide-up 0.6s cubic-bezier(0.19, 1, 0.22, 1) forwards; }
-        .animate-pop { animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        .animate-shake { animation: shake 0.35s ease-in-out; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        @keyframes slide-up { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pop { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
+        .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+        .animate-slide-up { animation: slide-up 0.7s cubic-bezier(0.19, 1, 0.22, 1) forwards; }
+        .animate-pop { animation: pop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(197, 160, 89, 0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(197, 160, 89, 0.3); border-radius: 12px; }
       `}</style>
     </div>
   );
