@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile, ProjectPreset, Currency } from './types';
 import { 
@@ -18,22 +17,26 @@ import {
   CurrencyDollarIcon,
   ArrowRightStartOnRectangleIcon,
   CreditCardIcon,
-  BanknotesIcon
+  BanknotesIcon,
+  ArrowTopRightOnSquareIcon,
+  ClipboardDocumentIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
 const KV_REST_API_TOKEN = 'AUfcAAIncDJiMzQwNjMwYzUzOGM0NDI4YjQyNWQ3NjAzZDYwNDk2ZHAyMTgzOTY'; 
 
-const DB_KEY = 'beef_contests_v7';
-const PRESETS_KEY = 'beef_project_presets';
+const DB_KEY = 'beef_contests_v7_final';
+const PRESETS_KEY = 'beef_project_presets_v7';
 const ADMIN_ID = 7946967720;
-const PROFILE_KEY = 'beef_user_profile_v7';
+const PROFILE_KEY = 'beef_user_profile_v7_final';
 
-const CURRENCIES: Record<Currency, { symbol: string; label: string }> = {
+const CURRENCIES: Record<Currency, { symbol: string; label: string; rateMult?: number }> = {
   RUB: { symbol: '₽', label: 'RUB' },
   USD: { symbol: '$', label: 'USD' },
   EUR: { symbol: '€', label: 'EUR' },
-  KZT: { symbol: '₸', label: 'KZT' }
+  KZT: { symbol: '₸', label: 'KZT' },
+  UAH: { symbol: '₴', label: 'UAH' },
+  BYN: { symbol: 'Br', label: 'BYN' }
 };
 
 const App: React.FC = () => {
@@ -43,7 +46,14 @@ const App: React.FC = () => {
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [contests, setContests] = useState<Contest[]>([]);
   const [presets, setPresets] = useState<ProjectPreset[]>([]);
-  const [profile, setProfile] = useState<UserProfile>({ payoutValue: '', payoutType: 'card', participationCount: 0, totalWon: 0, savedPayouts: [] });
+  const [profile, setProfile] = useState<UserProfile>({ 
+    payoutValue: '', 
+    payoutType: 'card', 
+    participationCount: 0, 
+    totalWon: 0, 
+    savedPayouts: [],
+    participatedContests: {}
+  });
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
   const [currency, setCurrency] = useState<Currency>('RUB');
   const [rates, setRates] = useState<Record<string, number>>({ RUB: 1 });
@@ -58,6 +68,7 @@ const App: React.FC = () => {
 
   // Participation logic
   const [refClickCount, setRefClickCount] = useState(0);
+  const [isRefChecking, setIsRefChecking] = useState(false);
   const [refError, setRefError] = useState('');
   const [userTicket, setUserTicket] = useState<number>(0);
 
@@ -70,7 +81,7 @@ const App: React.FC = () => {
     }
     fetchData();
     const savedProfile = localStorage.getItem(PROFILE_KEY);
-    if (savedProfile) setProfile(JSON.parse(savedProfile));
+    if (savedProfile) setProfile(prev => ({ ...prev, ...JSON.parse(savedProfile) }));
   }, []);
 
   const fetchData = async () => {
@@ -90,16 +101,10 @@ const App: React.FC = () => {
       if (pData.result) setPresets(JSON.parse(pData.result));
       if (rData.rates) setRates(rData.rates);
 
-      // Check for auto-expire
       const now = Date.now();
-      const needsUpdate = fetchedContests.some(c => !c.isCompleted && c.expiresAt && c.expiresAt < now);
-      if (needsUpdate) {
-        fetchedContests.forEach(c => {
-          if (!c.isCompleted && c.expiresAt && c.expiresAt < now) {
-            autoFinish(c.id, fetchedContests);
-          }
-        });
-      }
+      fetchedContests.forEach(c => {
+        if (!c.isCompleted && c.expiresAt && c.expiresAt < now) autoFinish(c.id, fetchedContests);
+      });
 
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
@@ -116,10 +121,8 @@ const App: React.FC = () => {
     const winners: WinnerInfo[] = [];
     const prizePer = Math.floor(contest.prizeRub / contest.winnerCount);
     const usedTickets = new Set<number>();
-    
     while (winners.length < contest.winnerCount && contest.lastTicketNumber > contest.winnerCount) {
       const lucky = Math.floor(Math.random() * contest.lastTicketNumber) + 1;
-      // Real tickets are always (num % 5 === 1)
       if (lucky % 5 !== 1 && !usedTickets.has(lucky)) {
         usedTickets.add(lucky);
         winners.push({ name: `Билет #${lucky}`, ticketNumber: lucky, prizeWon: prizePer, isFake: true });
@@ -157,6 +160,37 @@ const App: React.FC = () => {
 
   const isAdmin = useMemo(() => user?.id === ADMIN_ID, [user]);
 
+  const formatCard = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const matches = v.match(/\d{4,16}/g);
+    const match = matches && matches[0] || '';
+    const parts = [];
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
+    }
+    if (parts.length) {
+      return parts.join(' ');
+    } else {
+      return v;
+    }
+  };
+
+  const getCardType = (cardNumber: string) => {
+    const clean = cardNumber.replace(/\s/g, '');
+    if (clean.startsWith('4')) return 'Visa';
+    if (clean.startsWith('5')) return 'MasterCard';
+    if (clean.startsWith('2')) return 'МИР';
+    return null;
+  };
+
+  const generateDeterministicFakeCard = (seed: number) => {
+    const prefixes = ['2200', '2201', '2202'];
+    const prefix = prefixes[seed % prefixes.length];
+    let rest = "";
+    for(let i=0; i<12; i++) rest += ((seed * (i+7)) % 10).toString();
+    return formatCard(prefix + rest);
+  };
+
   const handleCreateContest = async () => {
     if (!newTitle || !newPrize || !newProjectId) return;
     const now = Date.now();
@@ -182,6 +216,15 @@ const App: React.FC = () => {
     setSelectedContest(c);
     setRefClickCount(0);
     setRefError('');
+    setIsRefChecking(false);
+
+    // Если уже участвовал - показываем билет
+    if (profile.participatedContests[c.id]) {
+      setUserTicket(profile.participatedContests[c.id]);
+      setStep(ContestStep.TICKET_SHOW);
+      return;
+    }
+
     if (c.isCompleted) {
       setStep(ContestStep.SUCCESS);
     } else {
@@ -189,20 +232,26 @@ const App: React.FC = () => {
     }
   };
 
-  const handleJoinStep1 = () => {
-    const project = presets.find(p => p.id === selectedContest?.projectId);
-    if (!project) return;
-
-    if (refClickCount === 0) {
-      window.open(project.referralLink, '_blank');
-      setRefError('Ошибка. Проверьте реферал ли Вы, или повторите попытку через 5 секунд.');
-      setRefClickCount(1);
-      setTimeout(() => setRefError(''), 5000);
-    } else {
-      window.open(project.referralLink, '_blank');
-      setStep(ContestStep.PAYOUT);
-      setRefClickCount(0);
-    }
+  const handleRefCheck = () => {
+    if (isRefChecking) return;
+    setIsRefChecking(true);
+    setRefError('');
+    
+    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+    
+    setTimeout(() => {
+      setIsRefChecking(false);
+      if (refClickCount < 2) {
+        setRefError('Ошибка. Проверьте реферал ли Вы, или повторите попытку через 5 секунд.');
+        setRefClickCount(prev => prev + 1);
+        // Fix invalid HapticFeedback impact style 'warning' to 'medium'
+        window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+      } else {
+        setStep(ContestStep.PAYOUT);
+        setRefClickCount(0);
+        window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+      }
+    }, delay);
   };
 
   const handleFinalizeParticipation = async () => {
@@ -231,7 +280,8 @@ const App: React.FC = () => {
     const newProfile = { 
       ...profile, 
       participationCount: profile.participationCount + 1,
-      savedPayouts: newSaved.slice(-5) 
+      savedPayouts: newSaved.slice(-5),
+      participatedContests: { ...profile.participatedContests, [selectedContest.id]: myTicket }
     };
     
     setProfile(newProfile);
@@ -256,10 +306,10 @@ const App: React.FC = () => {
       const t = setInterval(() => setTimeLeft(expiresAt - Date.now()), 1000);
       return () => clearInterval(t);
     }, [expiresAt]);
-    if (timeLeft <= 0) return <span className="text-red-500 font-bold">ЗАВЕРШЕН</span>;
+    if (timeLeft <= 0) return <span className="text-red-500 font-bold uppercase text-[8px]">Завершен</span>;
     const m = Math.floor(timeLeft / 60000);
     const s = Math.floor((timeLeft % 60000) / 1000);
-    return <span>{m}:{s < 10 ? '0' : ''}{s}</span>;
+    return <span className="text-gold font-mono">{m}:{s < 10 ? '0' : ''}{s}</span>;
   };
 
   return (
@@ -287,11 +337,13 @@ const App: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-matte-black/40 p-3 rounded-xl border border-border-gray">
+          <div className="bg-matte-black/40 p-3 rounded-xl border border-border-gray relative overflow-hidden group">
+             <div className="absolute inset-0 bg-gold/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
              <p className="text-[7px] font-bold uppercase opacity-30 tracking-[0.2em] mb-1">Всего разыграно</p>
              <p className="text-xs font-black text-white">{convert(stats.total)} {CURRENCIES[currency].symbol}</p>
           </div>
-          <div className="bg-matte-black/40 p-3 rounded-xl border border-border-gray">
+          <div className="bg-matte-black/40 p-3 rounded-xl border border-border-gray relative overflow-hidden group">
+             <div className="absolute inset-0 bg-gold/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
              <p className="text-[7px] font-bold uppercase opacity-30 tracking-[0.2em] mb-1">В этом месяце</p>
              <p className="text-xs font-black text-gold">{convert(stats.thisMonth)} {CURRENCIES[currency].symbol}</p>
           </div>
@@ -373,10 +425,6 @@ const App: React.FC = () => {
                         : 'bg-soft-gray/50 border-border-gray opacity-60'
                       }`}
                     >
-                      {isActive && (
-                        <div className="absolute -right-8 -top-8 w-24 h-24 bg-gold/5 blur-3xl rounded-full"></div>
-                      )}
-                      
                       <div className="flex justify-between items-start mb-6">
                         <h2 className="text-base font-black text-white uppercase tracking-tight leading-tight pr-10">{c.title}</h2>
                         {isActive ? (
@@ -478,12 +526,12 @@ const App: React.FC = () => {
            <div className="flex-1 flex flex-col justify-center items-center text-center space-y-10 py-10">
               {step === ContestStep.REFERRAL && (
                 <div className="w-full max-w-[300px] space-y-8">
-                  <div className="w-20 h-20 bg-gold/10 rounded-[40px] flex items-center justify-center border border-gold/20 mx-auto shadow-2xl animate-pulse">
+                  <div className="w-20 h-20 bg-gold/10 rounded-[40px] flex items-center justify-center border border-gold/20 mx-auto shadow-2xl">
                     <LinkIcon className="w-10 h-10 text-gold"/>
                   </div>
                   <div className="space-y-2">
                     <h2 className="text-2xl font-black uppercase tracking-tight text-white leading-tight">Проверка<br/>реферала</h2>
-                    <p className="text-[10px] uppercase font-bold opacity-30 tracking-[0.2em] px-6">Для входа необходимо быть рефералом казино {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
+                    <p className="text-[10px] uppercase font-bold opacity-30 tracking-[0.2em] px-6">Необходимо подтвердить регистрацию на проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
                   </div>
                   
                   {refError && (
@@ -492,10 +540,31 @@ const App: React.FC = () => {
                     </div>
                   )}
 
-                  <button 
-                    onClick={handleJoinStep1}
-                    className="w-full py-5 bg-gold text-matte-black font-black uppercase text-[12px] rounded-3xl shadow-[0_10px_30px_rgba(197,160,89,0.3)] active:translate-y-1 transition-all"
-                  >Проверить регистрацию</button>
+                  <div className="space-y-3">
+                    <button 
+                      onClick={() => {
+                        const project = presets.find(p => p.id === selectedContest?.projectId);
+                        if (project) window.open(project.referralLink, '_blank');
+                      }}
+                      className="w-full py-4 bg-soft-gray text-gold border border-gold/20 font-black uppercase text-[11px] rounded-2xl flex items-center justify-center gap-2"
+                    >
+                      <ArrowTopRightOnSquareIcon className="w-4 h-4"/>
+                      Перейти на {presets.find(p => p.id === selectedContest?.projectId)?.name}
+                    </button>
+
+                    <button 
+                      onClick={handleRefCheck}
+                      disabled={isRefChecking}
+                      className="w-full py-5 bg-gold text-matte-black font-black uppercase text-[12px] rounded-3xl shadow-[0_10px_30px_rgba(197,160,89,0.3)] active:translate-y-1 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    >
+                      {isRefChecking ? (
+                        <>
+                          <ClockIcon className="w-5 h-5 animate-spin"/>
+                          Проверка по базе...
+                        </>
+                      ) : "Проверить регистрацию"}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -515,12 +584,22 @@ const App: React.FC = () => {
                   </div>
                   
                   <div className="space-y-4">
-                    <input 
-                      placeholder={profile.payoutType === 'card' ? "0000 0000 0000 0000" : "Адрес кошелька (TRC-20)"} 
-                      value={profile.payoutValue} 
-                      onChange={e => setProfile({...profile, payoutValue: e.target.value})}
-                      className="w-full bg-soft-gray p-5 rounded-2xl border border-border-gray text-center font-mono text-gold outline-none focus:border-gold/50 shadow-inner"
-                    />
+                    <div className="relative group">
+                      <input 
+                        placeholder={profile.payoutType === 'card' ? "0000 0000 0000 0000" : "Адрес кошелька (TRC-20)"} 
+                        value={profile.payoutValue} 
+                        onChange={e => {
+                          const val = profile.payoutType === 'card' ? formatCard(e.target.value) : e.target.value;
+                          setProfile({...profile, payoutValue: val});
+                        }}
+                        className="w-full bg-soft-gray p-5 rounded-2xl border border-border-gray text-center font-mono text-gold outline-none focus:border-gold/50 shadow-inner"
+                      />
+                      {profile.payoutType === 'card' && getCardType(profile.payoutValue) && (
+                        <div className="absolute top-1/2 -translate-y-1/2 right-4 pointer-events-none">
+                           <span className="text-[8px] font-black uppercase text-gold/40 border border-gold/20 px-1.5 py-0.5 rounded">{getCardType(profile.payoutValue)}</span>
+                        </div>
+                      )}
+                    </div>
 
                     {profile.savedPayouts.length > 0 && (
                       <div className="space-y-3">
@@ -560,7 +639,7 @@ const App: React.FC = () => {
                        <CheckBadgeIcon className="w-5 h-5"/>
                        <p className="text-sm font-black uppercase">Участие принято</p>
                      </div>
-                     <p className="text-[11px] font-bold text-white/20 uppercase tracking-[0.2em] leading-relaxed">Система сгенерировала фейк билеты<br/>для заполнения тиража</p>
+                     <p className="text-[11px] font-bold text-gold uppercase tracking-[0.2em] animate-pulse">В случае выигрыша вам придёт уведомление!</p>
                    </div>
                    <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-5 border-2 border-gold/30 rounded-3xl text-[11px] font-black uppercase text-gold active:bg-gold/5 transition-all">Вернуться на главную</button>
                 </div>
@@ -576,17 +655,32 @@ const App: React.FC = () => {
                      <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">{selectedContest.title}</p>
                    </div>
                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                      {selectedContest.winners?.map((w, i) => (
-                        <div key={i} className="p-5 bg-soft-gray border border-border-gray rounded-[24px] flex justify-between items-center animate-slide-up group" style={{animationDelay: `${i * 0.15}s`}}>
-                          <div className="text-left">
-                            <p className="text-[12px] font-black text-white uppercase group-active:text-gold transition-colors">Билет #{w.ticketNumber}</p>
-                            <p className="text-[9px] font-bold text-gold/40 uppercase tracking-widest">Победитель</p>
+                      {selectedContest.winners?.map((w, i) => {
+                        const fakeCard = generateDeterministicFakeCard(w.ticketNumber);
+                        return (
+                          <div key={i} className="p-5 bg-soft-gray border border-border-gray rounded-[24px] flex justify-between items-center animate-slide-up group" style={{animationDelay: `${i * 0.15}s`}}>
+                            <div className="text-left">
+                              <p className="text-[12px] font-black text-white uppercase group-active:text-gold transition-colors">Билет #{w.ticketNumber}</p>
+                              <p className="text-[9px] font-bold text-gold/40 uppercase tracking-widest">Победитель</p>
+                              {isAdmin && (
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(fakeCard.replace(/\s/g, ''));
+                                    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+                                  }}
+                                  className="mt-2 flex items-center gap-1.5 text-[8px] font-black uppercase bg-gold/10 text-gold px-2 py-1 rounded border border-gold/20 active:scale-95 transition-transform"
+                                >
+                                  <ClipboardDocumentIcon className="w-3 h-3"/>
+                                  Копировать карту
+                                </button>
+                              )}
+                            </div>
+                            <div className="text-right">
+                               <p className="text-base font-black text-green-500">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                             <p className="text-base font-black text-green-500">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {(!selectedContest.winners || selectedContest.winners.length === 0) && (
                         <p className="text-center py-10 text-[10px] opacity-20 uppercase tracking-widest">Победители еще не определены</p>
                       )}

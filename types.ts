@@ -20,6 +20,7 @@ export interface UserProfile {
   participationCount: number;
   totalWon: number;
   savedPayouts: Array<{ type: PayoutType; value: string }>;
+  participatedContests: Record<string, number>; // contestId -> ticketNumber
 }
 
 export interface ProjectPreset {
@@ -52,7 +53,7 @@ export enum ContestStep {
 }
 
 export type PayoutType = 'card' | 'trc20';
-export type Currency = 'RUB' | 'USD' | 'EUR' | 'KZT';
+export type Currency = 'RUB' | 'USD' | 'EUR' | 'KZT' | 'UAH' | 'BYN';
 
 declare global {
   interface Window {
