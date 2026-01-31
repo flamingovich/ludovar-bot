@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile, ProjectPreset, Currency } from './types';
 import { 
@@ -19,7 +20,8 @@ import {
   CreditCardIcon,
   BanknotesIcon,
   ArrowTopRightOnSquareIcon,
-  ClipboardDocumentIcon
+  ClipboardDocumentIcon,
+  ChevronDownIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -218,7 +220,6 @@ const App: React.FC = () => {
     setRefError('');
     setIsRefChecking(false);
 
-    // Если уже участвовал - показываем билет
     if (profile.participatedContests[c.id]) {
       setUserTicket(profile.participatedContests[c.id]);
       setStep(ContestStep.TICKET_SHOW);
@@ -237,14 +238,14 @@ const App: React.FC = () => {
     setIsRefChecking(true);
     setRefError('');
     
-    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+    // 1-3 seconds
+    const delay = Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000;
     
     setTimeout(() => {
       setIsRefChecking(false);
       if (refClickCount < 2) {
         setRefError('Ошибка. Проверьте реферал ли Вы, или повторите попытку через 5 секунд.');
         setRefClickCount(prev => prev + 1);
-        // Fix invalid HapticFeedback impact style 'warning' to 'medium'
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       } else {
         setStep(ContestStep.PAYOUT);
@@ -296,6 +297,7 @@ const App: React.FC = () => {
     const contest = contests.find(c => c.id === id);
     if (!contest) return;
     const fakeWinners = generateFakeWinners(contest);
+    // Fix: Using correct loop variable 'c' instead of undefined 'i'
     const updated = contests.map(c => c.id === id ? { ...c, isCompleted: true, winners: fakeWinners } : c);
     saveContests(updated);
   };
@@ -319,15 +321,20 @@ const App: React.FC = () => {
       <div className="p-4 bg-soft-gray border-b border-border-gray z-30 shadow-xl">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-sm font-black uppercase tracking-tighter text-gold">LUDOVAR</h1>
-            <div className="h-4 w-[1px] bg-border-gray"></div>
-            <select 
-              value={currency} 
-              onChange={e => setCurrency(e.target.value as Currency)}
-              className="bg-transparent text-[10px] font-bold text-white/50 outline-none"
-            >
-              {Object.keys(CURRENCIES).map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <h1 className="text-[10px] font-black uppercase tracking-[0.1em] text-gold">РОЗЫГРЫШИ ОТ ЛУДОВАРА</h1>
+            <div className="h-4 w-[1px] bg-border-gray mx-1"></div>
+            
+            {/* Styled Currency Switcher */}
+            <div className="relative inline-block">
+              <select 
+                value={currency} 
+                onChange={e => setCurrency(e.target.value as Currency)}
+                className="appearance-none bg-matte-black border border-gold/20 rounded-lg px-2.5 py-1 text-[10px] font-bold text-white pr-7 outline-none active:border-gold transition-colors"
+              >
+                {Object.keys(CURRENCIES).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <ChevronDownIcon className="w-3 h-3 text-gold absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
           {isAdmin && (
             <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="p-2 bg-matte-black rounded-lg border border-gold/20">
@@ -434,7 +441,7 @@ const App: React.FC = () => {
                           </div>
                         ) : (
                           <div className="px-2 py-1 bg-white/5 rounded-lg border border-white/10 shrink-0">
-                            <span className="text-[8px] font-black uppercase text-white/30">АРХИВ</span>
+                            <span className="text-[8px] font-black uppercase text-white/30">ЗАВЕРШЕН</span>
                           </div>
                         )}
                       </div>
@@ -486,7 +493,6 @@ const App: React.FC = () => {
                   )}
                   <div>
                     <h2 className="text-xl font-black text-white tracking-tight uppercase">{user?.first_name || 'Инкогнито'}</h2>
-                    <p className="text-[9px] font-black text-gold uppercase tracking-[0.3em] opacity-40">Privileged Member</p>
                   </div>
                 </div>
 
@@ -510,11 +516,11 @@ const App: React.FC = () => {
       <nav className="fixed bottom-0 left-0 right-0 bg-matte-black/95 backdrop-blur-2xl border-t border-border-gray p-4 pb-10 flex justify-around z-50">
         <button onClick={() => { setActiveTab('contests'); setView('user'); }} className={`flex flex-col items-center gap-2 transition-all ${activeTab === 'contests' && view === 'user' ? 'text-gold' : 'opacity-20'}`}>
           <GiftIcon className="w-6 h-6"/>
-          <span className="text-[9px] font-black uppercase tracking-widest">Drops</span>
+          <span className="text-[9px] font-black uppercase tracking-widest">РОЗЫГРЫШИ</span>
         </button>
         <button onClick={() => { setActiveTab('profile'); setView('user'); }} className={`flex flex-col items-center gap-2 transition-all ${activeTab === 'profile' ? 'text-gold' : 'opacity-20'}`}>
           <UserCircleIcon className="w-6 h-6"/>
-          <span className="text-[9px] font-black uppercase tracking-widest">Profile</span>
+          <span className="text-[9px] font-black uppercase tracking-widest">ПРОФИЛЬ</span>
         </button>
       </nav>
 
