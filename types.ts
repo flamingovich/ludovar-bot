@@ -9,45 +9,50 @@ export interface TelegramUser {
 
 export interface WinnerInfo {
   name: string;
-  payoutValue: string;
-  payoutType: PayoutType;
-  registeredAt: string;
-  depositAmount: number;
+  ticketNumber: number;
   prizeWon: number;
+  isFake: boolean;
 }
 
 export interface UserProfile {
   payoutValue: string;
   payoutType: PayoutType;
-  isReferralVerified: boolean;
   participationCount: number;
   totalWon: number;
+  savedPayouts: Array<{ type: PayoutType; value: string }>;
+}
+
+export interface ProjectPreset {
+  id: string;
+  name: string;
+  referralLink: string;
 }
 
 export interface Contest {
   id: string;
   title: string;
-  description: string;
-  referralLink: string;
+  projectId: string; // ID пресета проекта
   prizeRub: number;
-  prizeUsd: number;
   createdAt: number;
-  expiresAt?: number | null; // null = вручную
-  participantCount: number;
+  expiresAt?: number | null;
+  participantCount: number; // Общее кол-во билетов
+  realParticipantCount: number; // Кол-во реальных людей
   isCompleted?: boolean;
   winners?: WinnerInfo[];
   winnerCount: number;
+  lastTicketNumber: number;
 }
 
 export enum ContestStep {
   LIST = 'list',
   REFERRAL = 'referral',
   PAYOUT = 'payout',
-  FINAL = 'final',
+  TICKET_SHOW = 'ticket_show',
   SUCCESS = 'success'
 }
 
 export type PayoutType = 'card' | 'trc20';
+export type Currency = 'RUB' | 'USD' | 'EUR' | 'KZT';
 
 declare global {
   interface Window {
