@@ -273,7 +273,6 @@ const App: React.FC = () => {
         setRefClickCount(prev => prev + 1);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       } else {
-        // Updated ContestStep.Payout to ContestStep.PAYOUT to match corrected enum definition
         setStep(ContestStep.PAYOUT);
         setRefClickCount(0);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
@@ -640,12 +639,6 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {step === ContestStep.REFERRAL && ( // This was a duplicate step in logic, but let's fix Payout check
-                null
-              )}
-
-              {step === ContestStep.LIST ? null : null}
-
               {step === ContestStep.SUCCESS && selectedContest?.isCompleted && (
                 <div className="w-full max-w-[400px] space-y-10 animate-fade-in">
                    <div className="w-20 h-20 bg-gold/10 rounded-[36px] flex items-center justify-center border border-gold/30 mx-auto shadow-lg relative">
@@ -655,15 +648,29 @@ const App: React.FC = () => {
                     </div>
                    </div>
                    <div className="space-y-3">
-                     <h2 className="text-[28px] font-black uppercase text-white tracking-tighter leading-none">Итоги</h2>
+                     <h2 className="text-[28px] font-black text-white tracking-tighter leading-none">Итоги розыгрыша</h2>
                      <p className="text-[13px] font-black text-white/40 uppercase tracking-widest">{selectedContest.title}</p>
+                   </div>
+
+                   {/* User participation info */}
+                   <div className="w-full">
+                     {selectedContest && profile.participatedContests[selectedContest.id] ? (
+                       <div className="bg-gold/10 border border-gold/20 py-3 px-6 rounded-2xl flex items-center justify-center gap-3">
+                         <TicketIcon className="w-5 h-5 text-gold" />
+                         <span className="text-[14px] font-bold text-gold">Ваш билет: #{profile.participatedContests[selectedContest.id]}</span>
+                       </div>
+                     ) : (
+                       <div className="bg-white/5 border border-white/10 py-3 px-6 rounded-2xl flex items-center justify-center gap-3">
+                         <span className="text-[14px] font-medium text-white/40">Вы не участвовали в этом розыгрыше</span>
+                       </div>
+                     )}
                    </div>
 
                    {/* Provably Fair Section */}
                    <div className="bg-soft-gray/50 border border-border-gray p-4 rounded-2xl space-y-3 text-left">
                      <div className="flex items-center gap-2">
                         <FingerPrintIcon className="w-4 h-4 text-gold" />
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-gold opacity-80">PROVABLY FAIR VERIFICATION</h4>
+                        <h4 className="text-[10px] font-black tracking-widest text-gold opacity-80">PROVABLY FAIR VERIFICATION</h4>
                      </div>
                      <div className="bg-matte-black p-3 rounded-xl border border-border-gray relative group">
                         <p className="text-[10px] font-mono text-white/30 break-all leading-relaxed line-clamp-2">
@@ -674,7 +681,7 @@ const App: React.FC = () => {
                      <button 
                       onClick={handleCheckHash}
                       disabled={verifyStatus !== 'idle'}
-                      className={`w-full py-3 rounded-xl text-[11px] font-black uppercase transition-all flex items-center justify-center gap-2 ${
+                      className={`w-full py-3 rounded-xl text-[11px] font-black transition-all flex items-center justify-center gap-2 ${
                         verifyStatus === 'verified' 
                         ? 'bg-green-500/20 text-green-500 border border-green-500/30' 
                         : 'bg-gold/10 text-gold border border-gold/20 active:bg-gold/20'
@@ -683,19 +690,19 @@ const App: React.FC = () => {
                         {verifyStatus === 'idle' && (
                           <>
                             <KeyIcon className="w-4 h-4" />
-                            ПРОВЕРИТЬ ХЭШ
+                            Проверить хэш
                           </>
                         )}
                         {verifyStatus === 'checking' && (
                           <>
                             <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                            РАСШИФРОВКА SEED...
+                            Расшифровка seed...
                           </>
                         )}
                         {verifyStatus === 'verified' && (
                           <>
                             <CheckBadgeIcon className="w-4 h-4" />
-                            ХЭШ ПОДТВЕРЖДЕН (PROBABLY FAIR)
+                            Хэш подтвержден (Probably Fair)
                           </>
                         )}
                      </button>
@@ -718,7 +725,7 @@ const App: React.FC = () => {
                                     navigator.clipboard.writeText(fakeCard.replace(/\s/g, ''));
                                     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
                                   }}
-                                  className="flex items-center gap-2 text-[10px] font-black uppercase bg-gold/15 text-gold px-3 py-1.5 rounded-lg border border-gold/20 active:scale-90 transition-all"
+                                  className="flex items-center gap-2 text-[10px] font-black bg-gold/15 text-gold px-3 py-1.5 rounded-lg border border-gold/20 active:scale-90 transition-all"
                                 >
                                   <ClipboardDocumentIcon className="w-3.5 h-3.5"/>
                                   Копировать
@@ -732,25 +739,25 @@ const App: React.FC = () => {
                         );
                       })}
                    </div>
-                   <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="w-full py-5 bg-gold text-matte-black font-black rounded-[28px] uppercase text-[14px] shadow-lg active:translate-y-1 transition-all">Закрыть</button>
+                   <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="w-full py-5 bg-gold text-matte-black font-black rounded-[28px] text-[14px] shadow-lg active:translate-y-1 transition-all">Закрыть</button>
                 </div>
               )}
 
-              {step === ContestStep.PAYOUT && ( // Updated reference to PAYOUT member in ContestStep enum
+              {step === ContestStep.PAYOUT && (
                 <div className="w-full max-w-[340px] space-y-10">
                   <div className="space-y-3">
-                    <h2 className="text-3xl font-black uppercase text-white tracking-tighter leading-none">Способ<br/>выплаты</h2>
+                    <h2 className="text-3xl font-black text-white tracking-tighter leading-none">Способ выплаты</h2>
                     <p className="text-[13px] font-bold text-white/20 uppercase tracking-widest font-light">Куда перечислить награду?</p>
                   </div>
                   
                   <div className="flex gap-4">
                     <button onClick={() => setProfile({...profile, payoutType: 'card'})} className={`flex-1 py-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 shadow-lg ${profile.payoutType === 'card' ? 'bg-gold/10 border-gold text-gold scale-105' : 'bg-matte-black border-border-gray text-white/10 opacity-50'}`}>
                       <CreditCardIcon className="w-8 h-8"/>
-                      <span className="text-[12px] font-black uppercase leading-none">Карта</span>
+                      <span className="text-[12px] font-black leading-none">Карта</span>
                     </button>
                     <button onClick={() => setProfile({...profile, payoutType: 'trc20'})} className={`flex-1 py-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 shadow-lg ${profile.payoutType === 'trc20' ? 'bg-gold/10 border-gold text-gold scale-105' : 'bg-matte-black border-border-gray text-white/10 opacity-50'}`}>
                       <BanknotesIcon className="w-8 h-8"/>
-                      <span className="text-[12px] font-black uppercase leading-none">TRC-20</span>
+                      <span className="text-[12px] font-black leading-none">TRC-20</span>
                     </button>
                   </div>
                   
@@ -769,7 +776,7 @@ const App: React.FC = () => {
                   <button 
                     onClick={handleFinalizeParticipation}
                     disabled={!profile.payoutValue}
-                    className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl uppercase text-[15px] shadow-lg disabled:opacity-20 active:translate-y-1 transition-all flex items-center justify-center gap-3"
+                    className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl text-[15px] shadow-lg disabled:opacity-20 active:translate-y-1 transition-all flex items-center justify-center gap-3"
                   >
                     <GiftIcon className="w-6 h-6" />
                     Занять место
