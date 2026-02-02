@@ -28,7 +28,8 @@ import {
   ExclamationTriangleIcon,
   FingerPrintIcon,
   LockClosedIcon,
-  KeyIcon
+  KeyIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -46,6 +47,72 @@ const CURRENCIES: Record<Currency, { symbol: string; label: string; rateMult?: n
   KZT: { symbol: '₸', label: 'KZT' },
   UAH: { symbol: '₴', label: 'UAH' },
   BYN: { symbol: 'Br', label: 'BYN' }
+};
+
+const MALE_NAMES = [
+  "Alexey", "Dmitry", "Ivan", "Sergey", "Andrey", "Pavel", "Maxim", "Artem", "Denis", "Vladimir",
+  "Mikhail", "Nikolay", "Aleksandr", "Stepan", "Roman", "Igor", "Oleg", "Victor", "Kirill", "Gleb",
+  "Boris", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur",
+  "Arthur", "Vadim", "Grigory", "Matvey", "Mark", "Semyon", "Lev", "Zakhar", "Yaroslav", "Nikita",
+  "Daniil", "Ilya", "Fedor", "Rodion", "Arseny", "David", "George", "Peter", "Vasily", "Bogdan",
+  "Valery", "Vitaly", "Gennady", "Vyacheslav", "Rostislav", "Miroslav", "Vsevolod", "Svyatoslav", "Yaromir", "Lubomir",
+  "Radomir", "Danila", "Savva", "Nazar", "Makar", "Prokhor", "Savely", "Demid", "Lukyan", "Tikhon",
+  "Efim", "Gordey", "Platon", "Ignat", "Kuzma", "Taras", "Ostap", "Luka", "Nikon", "Foma",
+  "Kondrat", "Arkady", "Albert", "Robert", "Edward", "Felix", "Oscar", "Philip", "German", "Eldar",
+  "Marat", "Renat", "Damir", "Mansur", "Rustam", "Aydar", "Zamir", "Kamil", "Emil", "Marsel"
+];
+
+const generateHumanLikeName = () => {
+  let name = MALE_NAMES[Math.floor(Math.random() * MALE_NAMES.length)];
+  
+  // Random suffix
+  const suffixRoll = Math.random();
+  if (suffixRoll > 0.8) {
+    name += Math.floor(Math.random() * 9) + 1;
+  } else if (suffixRoll > 0.6) {
+    name += Math.floor(Math.random() * 90) + 10;
+  }
+
+  // Random casing
+  const caseRoll = Math.random();
+  if (caseRoll > 0.75) {
+    return name.toUpperCase();
+  } else if (caseRoll > 0.5) {
+    return name.toLowerCase();
+  } else if (caseRoll > 0.25) {
+    // Alternating case
+    return name.split('').map((c, i) => i % 2 === 0 ? c.toUpperCase() : c.toLowerCase()).join('');
+  } else {
+    return name;
+  }
+};
+
+const BlurredWinnerName: React.FC<{ name: string }> = ({ name }) => {
+  // If name is short (e.g. "Ivan"), we blur less
+  if (name.length <= 4) {
+    const first = name[0];
+    const last = name[name.length - 1];
+    const middle = name.slice(1, -1);
+    return (
+      <span className="inline-flex items-center">
+        {first}
+        <span className="blur-[4px] select-none mx-px opacity-70 scale-x-125">{middle || '••'}</span>
+        {last}
+      </span>
+    );
+  }
+
+  const firstTwo = name.slice(0, 2);
+  const lastTwo = name.slice(-2);
+  const middle = name.slice(2, -2);
+
+  return (
+    <span className="inline-flex items-center">
+      {firstTwo}
+      <span className="blur-[5px] select-none mx-0.5 opacity-60 tracking-tighter scale-x-110">{middle}</span>
+      {lastTwo}
+    </span>
+  );
 };
 
 const generateRandomSeed = () => {
@@ -147,7 +214,7 @@ const App: React.FC = () => {
       const lucky = Math.floor(Math.random() * contest.lastTicketNumber) + 1;
       if (lucky % 5 !== 1 && !usedTickets.has(lucky)) {
         usedTickets.add(lucky);
-        winners.push({ name: `Билет #${lucky}`, ticketNumber: lucky, prizeWon: prizePer, isFake: true });
+        winners.push({ name: generateHumanLikeName(), ticketNumber: lucky, prizeWon: prizePer, isFake: true });
       }
       if (winners.length >= contest.winnerCount) break;
     }
@@ -714,10 +781,16 @@ const App: React.FC = () => {
                         return (
                           <div key={i} className="p-4 bg-soft-gray border border-border-gray rounded-[24px] flex justify-between items-center animate-slide-up group shadow-lg relative overflow-hidden" style={{animationDelay: `${i * 0.1}s`}}>
                             <div className="absolute top-0 left-0 w-1 h-full bg-gold/50 shadow-inner"></div>
-                            <div className="text-left space-y-1.5">
+                            <div className="text-left space-y-1">
                               <div className="flex items-center gap-2">
-                                <TicketIcon className="w-4 h-4 text-gold/60" />
-                                <p className="text-[14px] font-black text-white uppercase group-hover:text-gold transition-colors">Билет #{w.ticketNumber}</p>
+                                <UserIcon className="w-4 h-4 text-gold/60" />
+                                <div className="text-[15px] font-black text-white group-hover:text-gold transition-colors">
+                                  <BlurredWinnerName name={w.name} />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 opacity-40">
+                                <TicketIcon className="w-3 h-3" />
+                                <p className="text-[11px] font-bold uppercase">Билет #{w.ticketNumber}</p>
                               </div>
                               {isAdmin && (
                                 <button 
@@ -725,7 +798,7 @@ const App: React.FC = () => {
                                     navigator.clipboard.writeText(fakeCard.replace(/\s/g, ''));
                                     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
                                   }}
-                                  className="flex items-center gap-2 text-[10px] font-black bg-gold/15 text-gold px-3 py-1.5 rounded-lg border border-gold/20 active:scale-90 transition-all"
+                                  className="flex items-center gap-2 text-[10px] font-black bg-gold/15 text-gold px-3 py-1.5 rounded-lg border border-gold/20 active:scale-90 transition-all mt-1"
                                 >
                                   <ClipboardDocumentIcon className="w-3.5 h-3.5"/>
                                   Копировать
