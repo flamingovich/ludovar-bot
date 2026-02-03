@@ -86,7 +86,7 @@ const MALE_NAMES_EN = [
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
   "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
-  "Борис", "Anatoly", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Stanislav", "Тимур",
+  "Борис", "Anatoly", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Тимур",
   "Даниил", "Егор", "Никита", "Илья", "Матвей", "Макар", "Лев", "Марк", "Артемий", "Арсений",
   "Ян", "Савелий", "Демид", "Лука", "Тихон", "Ярослав", "Фёдор", "Пётр", "Семён", "Богдан",
   "Григорий", "Захар", "Елисей", "Филипп", "Артур", "Вадим", "Ростислав", "Георгий", "Леон", "Мирон",
@@ -358,7 +358,7 @@ const App: React.FC = () => {
     const contest = currentList.find(c => c.id === id);
     if (!contest || contest.isCompleted) return;
     const fakeWinners = generateFakeWinners(contest, availableAvatars);
-    const updated = currentList.map(c => c.id === id ? { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() } : c);
+    const updated = currentList.map(c => id === c.id ? { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() } : c);
     saveContests(updated);
   };
 
@@ -719,12 +719,16 @@ const App: React.FC = () => {
                         <div 
                           key={c.id} 
                           onClick={() => handleStartContest(c)}
-                          className={`relative p-5 rounded-3xl border backdrop-blur-sm transition-all active:scale-[0.98] group overflow-hidden shadow-lg ${
-                            isParticipating ? 'border-green-500/60 bg-soft-gray/70 ring-2 ring-green-500/10 shadow-green-500/5' : 'bg-soft-gray/70 border-gold/30 shadow-gold/5'
+                          className={`relative p-5 rounded-3xl border backdrop-blur-sm transition-all active:scale-[0.98] group overflow-hidden shadow-lg bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gold/10 via-soft-gray/70 to-soft-gray/70 ${
+                            isParticipating ? 'border-green-500/60 ring-2 ring-green-500/10 shadow-green-500/5' : 'border-gold/30 shadow-gold/5'
                           }`}
                         >
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-gold/5 blur-2xl pointer-events-none"></div>
+                          <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/[0.02] blur-xl pointer-events-none"></div>
+                          <div className="absolute -bottom-2 -left-2 w-12 h-12 border-l border-b border-gold/10 rounded-bl-3xl pointer-events-none"></div>
+                          
                           {isParticipating && (
-                            <div className="mb-3 flex items-center gap-2 text-green-500">
+                            <div className="mb-3 flex items-center gap-2 text-green-500 relative z-10">
                               <CheckBadgeIcon className="w-5 h-5" />
                               <span className="text-[12px] font-black uppercase tracking-wider drop-shadow-sm">Вы участвуете. Ваш Билет #{userParticipation}</span>
                             </div>
@@ -757,10 +761,8 @@ const App: React.FC = () => {
                             </div>
                           )}
 
-                          <div className="mt-6 w-full py-4 bg-matte-black/60 border border-gold/40 rounded-2xl text-[13px] uppercase text-center shadow-xl shadow-gold/20 relative z-10 transition-transform active:scale-95 flex items-center justify-center">
-                             <span className="text-gradient-gold font-black">
-                               {isParticipating ? 'ПЕРЕЙТИ В РОЗЫГРЫШ' : 'УЧАСТВОВАТЬ'}
-                             </span>
+                          <div className="mt-6 w-full py-4 bg-gold-shimmer rounded-2xl text-[13px] font-black text-matte-black uppercase text-center shadow-xl shadow-gold/20 relative z-10 transition-transform active:scale-95 flex items-center justify-center">
+                             {isParticipating ? 'ПЕРЕЙТИ В РОЗЫГРЫШ' : 'УЧАСТВОВАТЬ'}
                           </div>
 
                           {isAdmin && (
@@ -782,7 +784,10 @@ const App: React.FC = () => {
                     const userTicketNumber = profile.participatedContests[c.id];
                     const didParticipate = !!userTicketNumber;
                     return (
-                      <div key={c.id} onClick={() => handleStartContest(c)} className="relative p-5 rounded-3xl border bg-soft-gray/40 border-border-gray/50 opacity-80 transition-all active:scale-[0.98] grayscale-[0.6] shadow-md group overflow-hidden">
+                      <div key={c.id} onClick={() => handleStartContest(c)} className="relative p-5 rounded-3xl border bg-soft-gray/40 border-border-gray/50 opacity-80 transition-all active:scale-[0.98] grayscale-[0.6] shadow-md group overflow-hidden bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-white/[0.03] via-transparent to-transparent">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/[0.02] blur-xl pointer-events-none"></div>
+                        <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/[0.01] blur-lg pointer-events-none"></div>
+                        
                         <div className="flex justify-between items-start mb-4 relative z-10">
                           <h2 className="text-[16px] font-black uppercase text-white leading-tight">{c.title}</h2>
                           <span className="text-[10px] font-black uppercase text-white/30">END</span>
@@ -895,14 +900,19 @@ const App: React.FC = () => {
                     <button 
                       onClick={handleRefCheck} 
                       disabled={isRefChecking || !isProjectOpened} 
-                      className={`w-full py-5 font-black uppercase text-[14px] rounded-3xl shadow-lg active:translate-y-1 transition-all flex items-center justify-center gap-4 disabled:opacity-20 shadow-gold/20 ${!isProjectOpened ? 'bg-soft-gray/50 text-white/20 border border-white/5' : 'bg-gold text-matte-black'}`}
+                      className={`w-full py-5 font-black uppercase text-[14px] rounded-3xl shadow-lg active:translate-y-1 transition-all flex items-center justify-center gap-4 shadow-gold/20 ${!isProjectOpened ? 'bg-soft-gray text-white/20 border border-gold/10' : 'bg-gold text-matte-black'}`}
                     >
                       {isRefChecking ? (
                         <span className="flex items-center gap-3">
                           <ArrowPathIcon className="w-6 h-6 animate-spin"/>
                           Проверка регистрации на {presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект'}
                         </span>
-                      ) : "Проверить регистрацию"}
+                      ) : (
+                        <span className="flex items-center gap-3">
+                          {!isProjectOpened && <LockClosedIcon className="w-5 h-5 opacity-40" />}
+                          Проверить регистрацию
+                        </span>
+                      )}
                     </button>
                     {!isProjectOpened && (
                       <p className="text-[10px] font-black uppercase text-gold/40 tracking-widest animate-pulse">Сначала нажмите "Открыть проект"</p>
@@ -1131,6 +1141,12 @@ const App: React.FC = () => {
           background-size: 200% auto;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
+          animation: shine 3s linear infinite;
+        }
+
+        .bg-gold-shimmer {
+          background: linear-gradient(to right, #C5A059, #F3E5AB, #C5A059);
+          background-size: 200% auto;
           animation: shine 3s linear infinite;
         }
 
