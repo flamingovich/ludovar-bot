@@ -65,13 +65,17 @@ async function getChatInfo(userId: number) {
     const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getChat?chat_id=${userId}`);
     const data = await res.json();
     if (data.ok) {
+      const firstName = data.result.first_name || '';
+      const lastName = data.result.last_name || '';
+      const initial = firstName.charAt(0) || '?';
       return {
-        name: `${data.result.first_name || ''} ${data.result.last_name || ''}`.trim(),
-        username: data.result.username ? `@${data.result.username}` : '—'
+        name: `${firstName} ${lastName}`.trim(),
+        username: data.result.username ? `@${data.result.username}` : '—',
+        initial: initial.toUpperCase()
       };
     }
   } catch (e) {}
-  return { name: `User ${userId}`, username: '—' };
+  return { name: `User ${userId}`, username: '—', initial: '?' };
 }
 
 export default async function handler(req: Request) {
@@ -81,7 +85,6 @@ export default async function handler(req: Request) {
   try {
     const update = await req.json();
 
-    // Обработка нажатий на кнопки (Callback Queries)
     if (update.callback_query) {
       const cb = update.callback_query;
       const userId = cb.from.id;
@@ -89,7 +92,6 @@ export default async function handler(req: Request) {
       if (userId === ADMIN_ID && cb.data === 'detailed_stats') {
         const userIds: number[] = await kvGet(USERS_LIST_KEY) || [];
         
-        // Показываем уведомление, что начали сбор (может занять время)
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -97,7 +99,6 @@ export default async function handler(req: Request) {
         });
 
         let rowsHtml = '';
-        // Берем последних 100 или всех, если мало, чтобы не упереться в лимиты API
         const limit = Math.min(userIds.length, 200); 
         const usersToProcess = userIds.slice(-limit).reverse();
 
@@ -106,10 +107,11 @@ export default async function handler(req: Request) {
           rowsHtml += `
             <tr>
               <td>${id}</td>
-              <td>${info.name}</td>
-              <td>${info.username}</td>
-              <td>—</td>
-              <td>—</td>
+              <td style="width: 50px;">
+                <div class="avatar-circle">${info.initial}</div>
+              </td>
+              <td class="user-name">${info.name}</td>
+              <td class="user-link">${info.username}</td>
             </tr>`;
         }
 
@@ -118,35 +120,44 @@ export default async function handler(req: Request) {
           <html>
           <head>
             <meta charset="utf-8">
+            <title>Отчет BEEF • LUDOVAR</title>
             <style>
-              body { background-color: #0d0d0d; color: #e2e2e6; font-family: sans-serif; padding: 40px; }
-              h1 { color: #C5A059; text-transform: uppercase; letter-spacing: 2px; text-align: center; }
-              table { width: 100%; border-collapse: collapse; margin-top: 30px; background: #1c1c1e; border-radius: 15px; overflow: hidden; }
-              th, td { padding: 15px; text-align: left; border-bottom: 1px solid #2c2c2e; }
-              th { background-color: #C5A059; color: #0d0d0d; text-transform: uppercase; font-size: 12px; }
-              tr:hover { background-color: rgba(197, 160, 89, 0.05); }
-              .footer { margin-top: 20px; font-size: 10px; color: #444; text-align: center; }
+              body { background-color: #0d0d0d; color: #e2e2e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; margin: 0; }
+              .container { max-width: 900px; margin: 0 auto; }
+              h1 { color: #C5A059; text-transform: uppercase; letter-spacing: 4px; text-align: center; margin-bottom: 10px; font-weight: 900; }
+              .subtitle { text-align: center; opacity: 0.5; font-size: 12px; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 1px; }
+              table { width: 100%; border-collapse: separate; border-spacing: 0 8px; margin-top: 20px; }
+              th { padding: 15px; text-align: left; color: #C5A059; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; font-weight: 900; border-bottom: 2px solid #C5A059; }
+              td { padding: 12px 15px; background: #1c1c1e; border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(0,0,0,0.2); }
+              tr td:first-child { border-radius: 12px 0 0 12px; font-family: monospace; color: #555; font-size: 12px; }
+              tr td:last-child { border-radius: 0 12px 12px 0; }
+              .avatar-circle { width: 32px; height: 32px; background: linear-gradient(135deg, #C5A059 0%, #F3E5AB 100%); border-radius: 50%; display: flex; items-center: center; justify-content: center; color: #0d0d0d; font-weight: 900; font-size: 14px; border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin: 0 auto; line-height: 32px; text-align: center; }
+              .user-name { font-weight: 700; color: #fff; }
+              .user-link { color: #C5A059; font-weight: 500; }
+              tr:hover td { background-color: #242426; cursor: default; }
+              .footer { margin-top: 40px; font-size: 10px; color: #333; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
             </style>
           </head>
           <body>
-            <h1>Отчет по пользователям BEEF • LUDOVAR</h1>
-            <p style="text-align: center; opacity: 0.5;">Всего в базе: ${userIds.length} | Показано: ${limit}</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Имя</th>
-                  <th>Username</th>
-                  <th>Дата рег.</th>
-                  <th>Участий</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHtml}
-              </tbody>
-            </table>
-            <div class="footer">
-              * Данные о дате регистрации и кол-ве участий хранятся локально в TMA и не передаются на сервер.
+            <div class="container">
+              <h1>BEEF • LUDOVAR</h1>
+              <div class="subtitle">Отчет по пользователям | База: ${userIds.length} | Выборка: ${limit}</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Telegram ID</th>
+                    <th style="text-align: center;">Аватар</th>
+                    <th>Имя</th>
+                    <th>Username</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rowsHtml}
+                </tbody>
+              </table>
+              <div class="footer">
+                &copy; 2024 BEEF LUDOVAR SYSTEM • PRIVATE REPORT
+              </div>
             </div>
           </body>
           </html>`;
