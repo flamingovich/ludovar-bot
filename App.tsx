@@ -41,7 +41,7 @@ const KV_REST_API_TOKEN = 'AUfcAAIncDJiMzQwNjMwYzUzOGM0NDI4YjQyNWQ3NjAzZDYwNDk2Z
 
 const DB_KEY = 'beef_contests_v7_final';
 const PRESETS_KEY = 'beef_project_presets_v7';
-const AVATARS_KEY = 'beef_avatars_pool'; // Ключ для пула аватарок в Upstash
+const AVATARS_KEY = 'beef_avatars_pool'; 
 const ADMIN_ID = 7946967720;
 const PROFILE_KEY = 'beef_user_profile_v7_final';
 
@@ -144,7 +144,6 @@ const generateHumanLikeName = () => {
 };
 
 const generateValidRussianCard = () => {
-  // 2 - MIR, 4 - Visa, 5 - Mastercard
   const prefixes = ['2200', '2202', '2204', '4000', '4111', '5100'];
   const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
   let card = prefix;
@@ -152,11 +151,10 @@ const generateValidRussianCard = () => {
     card += Math.floor(Math.random() * 10);
   }
   
-  // Luhn algorithm check digit calculation
   let sum = 0;
   for (let i = 0; i < card.length; i++) {
     let digit = parseInt(card[card.length - 1 - i]);
-    if (i % 2 === 0) { // Since we want 16th to be even pos from end
+    if (i % 2 === 0) {
       digit *= 2;
       if (digit > 9) digit -= 9;
     }
@@ -206,7 +204,6 @@ const generateRandomSeed = () => {
   return result;
 };
 
-// Хелпер для алгоритма Луна
 const isValidLuhn = (val: string) => {
   let sum = 0;
   let shouldDouble = false;
@@ -224,7 +221,6 @@ const isValidLuhn = (val: string) => {
   return sum % 10 === 0;
 };
 
-// Хелпер для определения типа карты
 const getCardBrand = (val: string) => {
   const v = val.replace(/\s+/g, '');
   if (/^4/.test(v)) return 'Visa';
@@ -262,6 +258,9 @@ const App: React.FC = () => {
   const [newProjectId, setNewProjectId] = useState('');
   const [newDuration, setNewDuration] = useState<string>('300000');
 
+  const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetLink, setNewPresetLink] = useState('');
+
   const [refClickCount, setRefClickCount] = useState(0);
   const [isRefChecking, setIsRefChecking] = useState(false);
   const [refError, setRefError] = useState('');
@@ -293,9 +292,9 @@ const App: React.FC = () => {
       const rData = await rRes.json();
       const aData = await aRes.json();
       
-      let fetchedContests: Contest[] = cData.result ? JSON.parse(cData.result) : [];
-      setContests(fetchedContests);
-      if (pData.result) setPresets(JSON.parse(pData.result));
+      let fetchedContests: Contest[] = cData.result ? JSON.parse(cData.result) : contests;
+      let currentPresets: ProjectPreset[] = pData.result ? JSON.parse(pData.result) : presets;
+      setPresets(currentPresets);
       if (rData.rates) setRates(rData.rates);
 
       let loadedAvatars: string[] = [];
@@ -303,17 +302,26 @@ const App: React.FC = () => {
         try {
           loadedAvatars = JSON.parse(aData.result);
           setAvatars(loadedAvatars);
-        } catch (e) {
-          console.error("Failed to parse avatars from Upstash:", e);
-        }
+        } catch (e) { console.error(e); }
       }
 
       const now = Date.now();
-      fetchedContests.forEach(c => {
+      let updatedContests = [...fetchedContests];
+      let needsSave = false;
+
+      updatedContests.forEach((c, idx) => {
         if (!c.isCompleted && c.expiresAt && c.expiresAt < now) {
-          autoFinish(c.id, fetchedContests, loadedAvatars);
+          const fakeWinners = generateFakeWinners(c, loadedAvatars);
+          updatedContests[idx] = { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() };
+          needsSave = true;
         }
       });
+
+      if (needsSave) {
+        saveContests(updatedContests);
+      } else {
+        setContests(updatedContests);
+      }
 
     } catch (e) { 
       console.error("Fetch Data Error:", e); 
@@ -356,8 +364,16 @@ const App: React.FC = () => {
   };
 
   const saveContests = async (list: Contest[]) => {
+    if (!list || list.length === 0 && contests.length > 0) {
+      if (!window.confirm("Вы уверены, что хотите очистить весь список?")) return;
+    }
     setContests(list);
     await fetch(`${KV_REST_API_URL}/set/${DB_KEY}`, { method: 'POST', headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, body: JSON.stringify(list) });
+  };
+
+  const savePresets = async (list: ProjectPreset[]) => {
+    setPresets(list);
+    await fetch(`${KV_REST_API_URL}/set/${PRESETS_KEY}`, { method: 'POST', headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` }, body: JSON.stringify(list) });
   };
 
   const convert = (val: number) => {
@@ -405,6 +421,14 @@ const App: React.FC = () => {
     };
     await saveContests([newC, ...contests]);
     setNewTitle(''); setNewPrize(''); setNewWinners('1');
+    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+  };
+
+  const handleCreatePreset = async () => {
+    if (!newPresetName || !newPresetLink) return;
+    const newP: ProjectPreset = { id: Date.now().toString(), name: newPresetName, referralLink: newPresetLink };
+    await savePresets([...presets, newP]);
+    setNewPresetName(''); setNewPresetLink('');
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
   };
 
@@ -498,7 +522,7 @@ const App: React.FC = () => {
     if (timeLeft <= 0) return null;
     
     const formatTimeLeft = (ms: number) => {
-      const totalSec = Math.floor(ms / 1000);
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
       const days = Math.floor(totalSec / 86400);
       const hours = Math.floor((totalSec % 86400) / 3600);
       const minutes = Math.floor((totalSec % 3600) / 60);
@@ -506,7 +530,7 @@ const App: React.FC = () => {
 
       if (days > 0) return `${days}д:${hours}ч:${minutes}м`;
       if (hours > 0) return `${hours}ч:${minutes}м`;
-      return `${minutes}:${seconds < 10 ? '0' : ''}{seconds}`;
+      return `${minutes}м:${seconds < 10 ? '0' : ''}${seconds}с`;
     };
 
     return (
@@ -520,15 +544,17 @@ const App: React.FC = () => {
   };
 
   const contestLists = useMemo(() => {
-    const active = contests.filter(c => !c.isCompleted && (c.expiresAt ? c.expiresAt > Date.now() : true));
-    const completed = contests.filter(c => !(!c.isCompleted && (c.expiresAt ? c.expiresAt > Date.now() : true)));
+    const now = Date.now();
+    // Важно: если expiresAt === null, конкурс считается активным до ручного завершения
+    const active = contests.filter(c => !c.isCompleted && (!c.expiresAt || c.expiresAt > now));
+    const completed = contests.filter(c => c.isCompleted || (c.expiresAt && c.expiresAt <= now));
     return { active, completed };
   }, [contests]);
 
   return (
     <div className="h-screen bg-matte-black text-[#E2E2E6] overflow-hidden flex flex-col font-sans selection:bg-gold/30 relative">
       
-      {/* Glow Gradients Everywhere */}
+      {/* Glow Gradients */}
       <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[50%] bg-gold/5 blur-[100px] rounded-full animate-glow-slow pointer-events-none z-0"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-gold/3 blur-[80px] rounded-full animate-glow-fast pointer-events-none z-0"></div>
 
@@ -603,7 +629,27 @@ const App: React.FC = () => {
                 <button onClick={handleCreateContest} className="w-full py-4 bg-gold text-matte-black font-black rounded-xl uppercase text-[12px] active:scale-95 transition-all shadow-md relative z-10 shadow-gold/20">Опубликовать</button>
              </div>
 
-             <button onClick={async () => { if(window.confirm('Очистить историю?')) await saveContests([]); }} className="w-full py-4 border-2 border-red-500/20 text-red-500 font-black rounded-xl uppercase text-[11px] mt-4 relative z-10 shadow-lg active:bg-red-500/5">Очистить историю</button>
+             <div className="bg-soft-gray/80 backdrop-blur-md p-5 rounded-3xl border border-gold/40 space-y-5 shadow-xl relative overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <LinkIcon className="w-5 h-5 text-gold" />
+                  <h3 className="text-[14px] font-black uppercase text-gradient-gold tracking-wide">Управление проектами</h3>
+                </div>
+                <div className="space-y-4">
+                   <input placeholder="Название проекта" value={newPresetName} onChange={e => setNewPresetName(e.target.value)} className="w-full bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold"/>
+                   <input placeholder="Реф. ссылка" value={newPresetLink} onChange={e => setNewPresetLink(e.target.value)} className="w-full bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold"/>
+                   <button onClick={handleCreatePreset} className="w-full py-4 bg-gold text-matte-black font-black rounded-xl uppercase text-[11px] active:scale-95 transition-all">Добавить проект</button>
+                </div>
+                <div className="space-y-2 mt-4 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                   {presets.map(p => (
+                     <div key={p.id} className="flex justify-between items-center bg-matte-black/40 p-3 rounded-xl border border-white/5">
+                        <span className="text-[12px] font-bold text-white">{p.name}</span>
+                        <button onClick={() => savePresets(presets.filter(pr => pr.id !== p.id))} className="text-red-500/50 hover:text-red-500"><TrashIcon className="w-4 h-4"/></button>
+                     </div>
+                   ))}
+                </div>
+             </div>
+
+             <button onClick={() => saveContests([])} className="w-full py-4 border-2 border-red-500/20 text-red-500 font-black rounded-xl uppercase text-[11px] mt-4 relative z-10 shadow-lg active:bg-red-500/5">Очистить историю розыгрышей</button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -680,9 +726,6 @@ const App: React.FC = () => {
                   {contestLists.completed.map(c => {
                     const userTicketNumber = profile.participatedContests[c.id];
                     const didParticipate = !!userTicketNumber;
-                    // Always treat as lost for UI display as per request
-                    const didWinStatus = false;
-                    
                     return (
                       <div key={c.id} onClick={() => handleStartContest(c)} className="relative p-5 rounded-3xl border bg-soft-gray/40 border-border-gray/50 opacity-80 transition-all active:scale-[0.98] grayscale-[0.6] shadow-md group overflow-hidden">
                         <div className="flex justify-between items-start mb-4 relative z-10">
@@ -692,17 +735,10 @@ const App: React.FC = () => {
                         
                         <div className="flex justify-between items-center relative z-10 mb-4">
                            {didParticipate ? (
-                             didWinStatus ? (
-                               <div className="flex items-center gap-2 text-green-500">
-                                 <TrophyIcon className="w-4 h-4" />
-                                 <span className="text-[10px] font-black uppercase tracking-wider">Победа!</span>
-                               </div>
-                             ) : (
                                <div className="flex items-center gap-2 text-red-500/60">
                                  <XCircleIcon className="w-4 h-4" />
                                  <span className="text-[10px] font-black uppercase tracking-wider">Вы не выиграли</span>
                                </div>
-                             )
                            ) : (
                              <div className="flex items-center gap-2 text-white/20">
                                <FaceFrownIcon className="w-4 h-4" />
@@ -768,7 +804,6 @@ const App: React.FC = () => {
 
       {step !== ContestStep.LIST && (
         <div className="fixed inset-0 z-[100] bg-matte-black flex flex-col p-6 animate-slide-up no-scrollbar overflow-y-auto">
-           {/* Step Gradients */}
            <div className="absolute top-[-10%] right-[-10%] w-[70%] h-[50%] bg-gold/[0.07] blur-[120px] rounded-full pointer-events-none z-0"></div>
            <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[40%] bg-gold/[0.04] blur-[100px] rounded-full pointer-events-none z-0"></div>
 
@@ -859,7 +894,6 @@ const App: React.FC = () => {
                   
                   {profile.payoutType === 'card' ? (
                     <div className="relative w-full aspect-[1.6/1] bg-gradient-to-br from-[#1c1c1e] to-[#0d0d0d] rounded-[32px] border border-gold/40 p-8 text-left shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden group shadow-gold/5">
-                      {/* Card Glow */}
                       <div className="absolute top-[-20%] right-[-10%] w-40 h-40 bg-gold/5 blur-[60px] rounded-full group-hover:bg-gold/10 transition-all"></div>
                       
                       <div className="flex justify-between items-start mb-10">
