@@ -67,15 +67,25 @@ async function getChatInfo(userId: number) {
     if (data.ok) {
       const firstName = data.result.first_name || '';
       const lastName = data.result.last_name || '';
-      const initial = firstName.charAt(0) || '?';
       return {
         name: `${firstName} ${lastName}`.trim(),
-        username: data.result.username ? `@${data.result.username}` : '—',
-        initial: initial.toUpperCase()
+        username: data.result.username ? `@${data.result.username}` : '—'
       };
     }
   } catch (e) {}
-  return { name: `User ${userId}`, username: '—', initial: '?' };
+  return { name: `User ${userId}`, username: '—' };
+}
+
+function getFormattedTimestamp() {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const d = pad(now.getDate());
+  const m = pad(now.getMonth() + 1);
+  const y = now.getFullYear().toString().slice(-2);
+  const h = pad(now.getHours());
+  const min = pad(now.getMinutes());
+  const s = pad(now.getSeconds());
+  return `${d}${m}${y}${h}${min}${s}`;
 }
 
 export default async function handler(req: Request) {
@@ -107,9 +117,6 @@ export default async function handler(req: Request) {
           rowsHtml += `
             <tr>
               <td>${id}</td>
-              <td style="width: 50px;">
-                <div class="avatar-circle">${info.initial}</div>
-              </td>
               <td class="user-name">${info.name}</td>
               <td class="user-link">${info.username}</td>
             </tr>`;
@@ -131,7 +138,6 @@ export default async function handler(req: Request) {
               td { padding: 12px 15px; background: #1c1c1e; border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(0,0,0,0.2); }
               tr td:first-child { border-radius: 12px 0 0 12px; font-family: monospace; color: #555; font-size: 12px; }
               tr td:last-child { border-radius: 0 12px 12px 0; }
-              .avatar-circle { width: 32px; height: 32px; background: linear-gradient(135deg, #C5A059 0%, #F3E5AB 100%); border-radius: 50%; display: flex; items-center: center; justify-content: center; color: #0d0d0d; font-weight: 900; font-size: 14px; border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin: 0 auto; line-height: 32px; text-align: center; }
               .user-name { font-weight: 700; color: #fff; }
               .user-link { color: #C5A059; font-weight: 500; }
               tr:hover td { background-color: #242426; cursor: default; }
@@ -146,7 +152,6 @@ export default async function handler(req: Request) {
                 <thead>
                   <tr>
                     <th>Telegram ID</th>
-                    <th style="text-align: center;">Аватар</th>
                     <th>Имя</th>
                     <th>Username</th>
                   </tr>
@@ -162,7 +167,8 @@ export default async function handler(req: Request) {
           </body>
           </html>`;
 
-        await sendDocument(ADMIN_ID, html, 'ludovar_stats.html', `📊 *Подробная статистика*\n\nВ файле информация о последних ${limit} активных пользователях.`);
+        const uniqueFilename = `ludovar_club_${getFormattedTimestamp()}.html`;
+        await sendDocument(ADMIN_ID, html, uniqueFilename, `📊 *Подробная статистика*\n\nВ файле информация о последних ${limit} активных пользователях.`);
         return new Response('OK', { status: 200 });
       }
       return new Response('OK', { status: 200 });
