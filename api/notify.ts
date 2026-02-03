@@ -38,7 +38,7 @@ export default async function handler(req: Request) {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
-              [{ text: '🚀 УЧАСТВОВАТЬ', url: 'https://t.me/Ludovar_Bot/BeefMiniApp' }]
+              [{ text: '🚀 УЧАСТВОВАТЬ', url: 'https://t.me/ludovar_gift_bot/gift' }]
             ]
           }
         }),

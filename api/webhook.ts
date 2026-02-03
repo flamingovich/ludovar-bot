@@ -11,11 +11,15 @@ const ADMIN_ID = 7946967720;
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 async function kvGet(key: string) {
-  const res = await fetch(`${KV_REST_API_URL}/get/${key}`, {
-    headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` },
-  });
-  const data = await res.json();
-  return data.result ? JSON.parse(data.result) : null;
+  try {
+    const res = await fetch(`${KV_REST_API_URL}/get/${key}`, {
+      headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` },
+    });
+    const data = await res.json();
+    return data.result ? JSON.parse(data.result) : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 async function kvSet(key: string, value: any) {
@@ -36,6 +40,7 @@ async function sendMessage(chatId: number, text: string) {
 }
 
 export default async function handler(req: Request) {
+  // На любой запрос от Telegram отвечаем 200 OK сразу, чтобы избежать повторов
   if (req.method !== 'POST') return new Response('OK', { status: 200 });
   if (!BOT_TOKEN) return new Response('Bot Token Not Set', { status: 500 });
 
@@ -43,16 +48,22 @@ export default async function handler(req: Request) {
     const update = await req.json();
     const message = update.message;
 
-    if (!message || !message.from || !message.chat) return new Response('OK', { status: 200 });
+    if (!message || !message.from) return new Response('OK', { status: 200 });
 
     const userId = message.from.id;
     const text = message.text || '';
 
-    // Проверка прав админа
-    if (userId !== ADMIN_ID) return new Response('OK', { status: 200 });
+    // Только админ может управлять ботом через команды
+    if (userId !== ADMIN_ID) {
+        // Обычным пользователям можно отвечать приветствием или просто игнорировать
+        return new Response('OK', { status: 200 });
+    }
 
-    // Проверяем состояние админа (не ждем ли мы сообщение для рассылки)
-    const broadcastState = await kvGet(ADMIN_STATE_KEY);
+    // Если админ ввел /start, подтверждаем работу
+    if (text === '/start') {
+        await sendMessage(ADMIN_ID, "👋 *Бот Лудовара на связи!*\n\nТвой ID: `" + ADMIN_ID + "` подтвержден как администратор.\n\nКоманды:\n/send — запустить рассылку");
+        return new Response('OK', { status: 200 });
+    }
 
     // Если ввели команду /send
     if (text === '/send') {
@@ -61,26 +72,29 @@ export default async function handler(req: Request) {
       return new Response('OK', { status: 200 });
     }
 
-    // Если админ прислал сообщение в режиме рассылки
-    if (broadcastState && broadcastState.active) {
-      // Сразу выключаем режим, чтобы не зациклиться
-      await kvSet(ADMIN_STATE_KEY, { active: false });
+    // Проверяем состояние админа (не ждем ли мы сообщение для рассылки)
+    const broadcastState = await kvGet(ADMIN_STATE_KEY);
 
-      await sendMessage(ADMIN_ID, "⌛ *Начинаю рассылку...*");
+    if (broadcastState && broadcastState.active) {
+      // Выключаем режим рассылки
+      await kvSet(ADMIN_STATE_KEY, { active: false });
 
       // Получаем список пользователей
       const userIds: number[] = await kvGet(USERS_LIST_KEY) || [];
       
       if (userIds.length === 0) {
-        await sendMessage(ADMIN_ID, "❌ Ошибка: Список пользователей пуст.");
+        await sendMessage(ADMIN_ID, "❌ Ошибка: В базе данных еще нет зарегистрированных пользователей.");
         return new Response('OK', { status: 200 });
       }
+
+      await sendMessage(ADMIN_ID, `⌛ *Начинаю рассылку на ${userIds.length} пользователей...*`);
 
       let successCount = 0;
       let failCount = 0;
 
       // Рассылаем методом copyMessage (сохраняет форматирование и медиа)
-      const sendPromises = userIds.map(async (targetId) => {
+      // Используем цикл, чтобы не перегружать API слишком сильно
+      for (const targetId of userIds) {
         try {
           const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/copyMessage`, {
             method: 'POST',
@@ -92,10 +106,10 @@ export default async function handler(req: Request) {
             }),
           });
           if (res.ok) successCount++; else failCount++;
-        } catch (e) { failCount++; }
-      });
-
-      await Promise.all(sendPromises);
+        } catch (e) { 
+          failCount++; 
+        }
+      }
 
       await sendMessage(ADMIN_ID, `✅ *Рассылка завершена!*\n\nДоставлено: ${successCount}\nОшибок: ${failCount}`);
       return new Response('OK', { status: 200 });
@@ -103,7 +117,8 @@ export default async function handler(req: Request) {
 
     return new Response('OK', { status: 200 });
   } catch (error) {
-    console.error('Webhook error:', error);
+    // В случае критической ошибки отправляем отчет админу (если возможно)
+    try { await sendMessage(ADMIN_ID, "⚠️ Произошла ошибка в работе Webhook: " + (error as Error).message); } catch(e) {}
     return new Response('OK', { status: 200 });
   }
 }
