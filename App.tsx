@@ -68,7 +68,7 @@ const MALE_NAMES_EN = [
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
   "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
-  "Борис", "Анатолий", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Ruslan", "Timur",
+  "Борис", "Анатолий", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Руслан", "Тимур",
   "Даниил", "Егор", "Никита", "Илья", "Матвей", "Макар", "Лев", "Марк", "Артемий", "Арсений",
   "Ян", "Савелий", "Демид", "Лука", "Тихон", "Ярослав", "Фёдор", "Пётр", "Семён", "Богдан",
   "Григорий", "Захар", "Елисей", "Филипп", "Артур", "Вадим", "Ростислав", "Георгий", "Леон", "Мирон",
@@ -91,7 +91,7 @@ const SURNAMES_EN = [
 
 const SURNAMES_RU = [
   "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Соколов", "Михайлов", "Новиков", "Федоров",
-  "Морозов", "Волков", "Алексеев", "Lebedev", "Semenov", "Egorov", "Pavlov", "Козлов", "Степанов", "Николаев",
+  "Морозов", "Волков", "Алексеев", "Лебедев", "Семенов", "Егоров", "Павлов", "Козлов", "Степанов", "Николаев",
   "Тихонов", "Белов", "Морозов", "Крылов", "Макаров", "Зайцев", "Соловьев", "Борисов", "Романов", "Воробьев",
   "Фролов", "Медведев", "Семенов", "Жуков", "Куликов", "Беляев", "Тарасов", "Белоусов", "Орлов", "Киселев",
   "Миронов", "Марков", "Никитин", "Соболев", "Королев", "Коновалов", "Федотов", "Щербаков", "Воронин", "Титов",
@@ -100,7 +100,7 @@ const SURNAMES_RU = [
 ];
 
 const generateHumanLikeName = () => {
-  const isRussian = Math.random() > 0.5; // True 50/50 mix
+  const isRussian = Math.random() > 0.5;
   const names = isRussian ? MALE_NAMES_RU : MALE_NAMES_EN;
   const surnames = isRussian ? SURNAMES_RU : SURNAMES_EN;
   
@@ -220,7 +220,7 @@ const App: React.FC = () => {
         fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } }),
         fetch(`${KV_REST_API_URL}/get/${PRESETS_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } }),
         fetch('https://api.exchangerate-api.com/v4/latest/RUB'),
-        fetch('/avatars.txt').then(r => r.text()).catch(() => '')
+        fetch('avatars.txt').then(r => r.text()).catch(() => '')
       ]);
       const cData = await cRes.json();
       const pData = await pRes.json();
@@ -233,7 +233,7 @@ const App: React.FC = () => {
 
       let loadedAvatars: string[] = [];
       if (aRes) {
-        loadedAvatars = aRes.split('\n').map(s => s.trim()).filter(s => s.startsWith('http'));
+        loadedAvatars = aRes.split(/[\n\r]+/).map(s => s.trim()).filter(s => s.startsWith('http'));
         setAvatars(loadedAvatars);
       }
 
@@ -257,13 +257,16 @@ const App: React.FC = () => {
 
   const generateFakeWinners = (contest: Contest, availableAvatars?: string[]): WinnerInfo[] => {
     const winners: WinnerInfo[] = [];
-    const prizePer = Math.floor(contest.prizeRub / contest.winnerCount);
+    const prizePer = Math.floor(contest.prizeRub / (contest.winnerCount || 1));
     const usedTickets = new Set<number>();
-    const avatarPool = availableAvatars || avatars;
+    
+    // Используем переданный аргумент или текущее состояние аватарок
+    const avatarPool = (availableAvatars && availableAvatars.length > 0) ? availableAvatars : avatars;
 
-    while (winners.length < contest.winnerCount && (contest.lastTicketNumber > contest.winnerCount || winners.length < contest.lastTicketNumber)) {
-      const lucky = Math.floor(Math.random() * (contest.lastTicketNumber || 100)) + 1;
-      if (lucky % 5 !== 1 && !usedTickets.has(lucky)) {
+    while (winners.length < contest.winnerCount && (contest.lastTicketNumber > 0)) {
+      const lucky = Math.floor(Math.random() * (contest.lastTicketNumber)) + 1;
+      // Простая проверка чтобы не выигрывал всегда один и тот же билет, и не реальный пользователь (имитация)
+      if (!usedTickets.has(lucky)) {
         usedTickets.add(lucky);
         const avatarUrl = avatarPool.length > 0 ? avatarPool[Math.floor(Math.random() * avatarPool.length)] : undefined;
         winners.push({ 
@@ -274,7 +277,7 @@ const App: React.FC = () => {
           avatarUrl: avatarUrl
         });
       }
-      if (winners.length >= contest.winnerCount) break;
+      if (winners.length >= contest.winnerCount || usedTickets.size >= contest.lastTicketNumber) break;
     }
     return winners;
   };
@@ -432,7 +435,8 @@ const App: React.FC = () => {
   const finishContestManually = (id: string) => {
     const contest = contests.find(c => c.id === id);
     if (!contest) return;
-    const fakeWinners = generateFakeWinners(contest);
+    // Явно передаем текущее состояние аватарок для генерации
+    const fakeWinners = generateFakeWinners(contest, avatars);
     const updated = contests.map(c => {
       if (c.id === id) {
         return { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() };
