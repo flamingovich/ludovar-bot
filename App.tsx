@@ -483,16 +483,16 @@ const App: React.FC = () => {
       <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[50%] bg-gold/5 blur-[100px] rounded-full animate-glow-slow pointer-events-none z-0"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-gold/3 blur-[80px] rounded-full animate-glow-fast pointer-events-none z-0"></div>
 
-      <div className="px-4 py-5 bg-soft-gray/80 backdrop-blur-lg border-b border-border-gray z-30 shadow-xl relative overflow-hidden shrink-0">
+      <div className="px-4 py-5 bg-soft-gray/80 backdrop-blur-lg border-b border-border-gray z-30 shadow-xl relative overflow-hidden shrink-0 shadow-gold/5">
         <div className="absolute top-[-20%] right-[-10%] w-[40%] h-[150%] bg-gold/5 blur-[50px] rounded-full pointer-events-none animate-glow-slow"></div>
         <div className="flex justify-between items-center mb-5 relative z-10">
           <div className="flex items-center gap-3">
-            <h1 className="text-[13px] font-black uppercase tracking-tight text-gold">РОЗЫГРЫШИ ОТ ЛУДОВАРА</h1>
+            <h1 className="text-[13px] font-black uppercase tracking-tight text-gold drop-shadow-sm">РОЗЫГРЫШИ ОТ ЛУДОВАРА</h1>
             <div className="relative inline-block">
               <select 
                 value={currency} 
                 onChange={e => setCurrency(e.target.value as Currency)}
-                className="appearance-none bg-matte-black/60 border border-gold/20 rounded-xl px-3 py-1.5 text-[11px] font-black text-white pr-9 outline-none shadow-md backdrop-blur-md"
+                className="appearance-none bg-matte-black/60 border border-gold/20 rounded-xl px-3 py-1.5 text-[11px] font-black text-white pr-9 outline-none shadow-md backdrop-blur-md shadow-gold/5"
               >
                 {Object.keys(CURRENCIES).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -500,14 +500,14 @@ const App: React.FC = () => {
             </div>
           </div>
           {isAdmin && (
-            <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="p-2.5 bg-matte-black rounded-xl border border-gold/20 active:scale-90 transition-all shadow-lg">
+            <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="p-2.5 bg-matte-black rounded-xl border border-gold/20 active:scale-90 transition-all shadow-lg hover:shadow-gold/10">
               <ShieldCheckIcon className="w-5 h-5 text-gold"/>
             </button>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 relative z-10">
-          <div className="bg-matte-black/60 backdrop-blur-sm p-3 rounded-2xl border border-border-gray/50 flex flex-col gap-1 relative overflow-hidden group">
+          <div className="bg-matte-black/60 backdrop-blur-sm p-3 rounded-2xl border border-border-gray/50 flex flex-col gap-1 relative overflow-hidden group shadow-lg shadow-black/20">
              <div className="absolute -right-4 -bottom-4 w-12 h-12 bg-white/5 blur-xl rounded-full"></div>
              <div className="flex items-center gap-2 opacity-30">
                <CurrencyDollarIcon className="w-4 h-4" />
@@ -515,7 +515,7 @@ const App: React.FC = () => {
              </div>
              <p className="text-[15px] font-black text-white">{convert(stats.total)} {CURRENCIES[currency].symbol}</p>
           </div>
-          <div className="bg-matte-black/60 backdrop-blur-sm p-3 rounded-2xl border border-border-gray/50 flex flex-col gap-1 relative overflow-hidden group">
+          <div className="bg-matte-black/60 backdrop-blur-sm p-3 rounded-2xl border border-border-gray/50 flex flex-col gap-1 relative overflow-hidden group shadow-lg shadow-gold/5">
              <div className="absolute -right-4 -bottom-4 w-12 h-12 bg-gold/5 blur-xl rounded-full"></div>
              <div className="flex items-center gap-2 opacity-30 text-gold">
                <SparklesIcon className="w-4 h-4" />
@@ -529,7 +529,7 @@ const App: React.FC = () => {
       <div className="flex-1 overflow-y-auto px-4 py-5 no-scrollbar relative z-10 pb-24">
         {view === 'admin' ? (
           <div className="space-y-5">
-             <div className="bg-soft-gray/80 backdrop-blur-md p-5 rounded-3xl border border-border-gray/50 space-y-5 shadow-lg relative overflow-hidden">
+             <div className="bg-soft-gray/80 backdrop-blur-md p-5 rounded-3xl border border-border-gray/50 space-y-5 shadow-xl relative overflow-hidden shadow-gold/5">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-gold/5 blur-3xl"></div>
                 <div className="flex items-center gap-2 relative z-10">
                   <PlusIcon className="w-5 h-5 text-gold" />
@@ -541,15 +541,15 @@ const App: React.FC = () => {
                     <input type="number" placeholder="Приз (RUB)" value={newPrize} onChange={e => setNewPrize(e.target.value)} className="bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold transition-all"/>
                     <input type="number" placeholder="Победителей" value={newWinners} onChange={e => setNewWinners(e.target.value)} className="bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold transition-all"/>
                   </div>
-                  <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="w-full bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-gold font-bold outline-none">
+                  <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="w-full bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-gold font-bold outline-none shadow-inner">
                     <option value="">Выберите пресет</option>
                     {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
-                <button onClick={handleCreateContest} className="w-full py-4 bg-gold text-matte-black font-black rounded-xl uppercase text-[12px] active:scale-95 transition-all shadow-md relative z-10">Опубликовать</button>
+                <button onClick={handleCreateContest} className="w-full py-4 bg-gold text-matte-black font-black rounded-xl uppercase text-[12px] active:scale-95 transition-all shadow-md relative z-10 shadow-gold/20">Опубликовать</button>
              </div>
 
-             <button onClick={async () => { if(window.confirm('Очистить историю?')) await saveContests([]); }} className="w-full py-4 border-2 border-red-500/20 text-red-500 font-black rounded-xl uppercase text-[11px] mt-4 relative z-10">Очистить историю</button>
+             <button onClick={async () => { if(window.confirm('Очистить историю?')) await saveContests([]); }} className="w-full py-4 border-2 border-red-500/20 text-red-500 font-black rounded-xl uppercase text-[11px] mt-4 relative z-10 shadow-lg active:bg-red-500/5">Очистить историю</button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -557,7 +557,7 @@ const App: React.FC = () => {
               <div className="flex flex-col">
                 <div className="space-y-4 mb-8">
                   {contestLists.active.length === 0 ? (
-                    <div className="py-12 px-6 text-center bg-soft-gray/30 rounded-[32px] border border-white/5 backdrop-blur-sm">
+                    <div className="py-12 px-6 text-center bg-soft-gray/30 rounded-[32px] border border-white/5 backdrop-blur-sm shadow-inner">
                        <FaceFrownIcon className="w-10 h-10 text-white/10 mx-auto mb-4" />
                        <p className="text-[13px] font-bold text-white/30 uppercase tracking-widest leading-relaxed">В данный момент активных розыгрышей нет, но скоро они появятся :)</p>
                     </div>
@@ -569,14 +569,14 @@ const App: React.FC = () => {
                         <div 
                           key={c.id} 
                           onClick={() => handleStartContest(c)}
-                          className={`relative p-5 rounded-3xl border backdrop-blur-sm transition-all active:scale-[0.98] group overflow-hidden ${
-                            isParticipating ? 'border-green-500/60 bg-soft-gray/70 ring-2 ring-green-500/10' : 'bg-soft-gray/70 border-gold/30 shadow-lg'
+                          className={`relative p-5 rounded-3xl border backdrop-blur-sm transition-all active:scale-[0.98] group overflow-hidden shadow-lg ${
+                            isParticipating ? 'border-green-500/60 bg-soft-gray/70 ring-2 ring-green-500/10 shadow-green-500/5' : 'bg-soft-gray/70 border-gold/30 shadow-gold/5'
                           }`}
                         >
                           {isParticipating && (
                             <div className="mb-3 flex items-center gap-2 text-green-500">
                               <CheckBadgeIcon className="w-5 h-5" />
-                              <span className="text-[12px] font-black uppercase tracking-wider">Вы участвуете. Ваш Билет #{userParticipation}</span>
+                              <span className="text-[12px] font-black uppercase tracking-wider drop-shadow-sm">Вы участвуете. Ваш Билет #{userParticipation}</span>
                             </div>
                           )}
                           <div className="flex justify-between items-start mb-6 relative z-10">
@@ -589,7 +589,7 @@ const App: React.FC = () => {
                           <div className="grid grid-cols-3 gap-4 border-t border-border-gray/50 pt-5 relative z-10">
                             <div className="space-y-1">
                               <p className="text-[10px] font-bold uppercase opacity-30 tracking-widest text-white">Фонд</p>
-                              <p className="text-[17px] font-black tracking-tight text-gold-light">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
+                              <p className="text-[17px] font-black tracking-tight text-gold-light drop-shadow-sm">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
                             </div>
                             <div className="space-y-1 text-center">
                               <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest text-white">Мест</p>
@@ -606,6 +606,15 @@ const App: React.FC = () => {
                                <Countdown expiresAt={c.expiresAt}/>
                             </div>
                           )}
+
+                          {isAdmin && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); autoFinish(c.id, contests, avatars); }}
+                              className="mt-5 w-full py-4 bg-matte-black/60 border border-gold/40 rounded-2xl text-[12px] font-black text-gold uppercase relative z-10 hover:bg-gold/10 transition-colors shadow-lg active:scale-95"
+                            >
+                              Завершить досрочно
+                            </button>
+                          )}
                         </div>
                       );
                     })
@@ -614,7 +623,7 @@ const App: React.FC = () => {
                 {contestLists.completed.length > 0 && <div className="flex items-center gap-4 py-4 mb-4"><div className="h-[1px] flex-1 bg-border-gray/50"></div><span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Завершенные</span><div className="h-[1px] flex-1 bg-border-gray/50"></div></div>}
                 <div className="space-y-4">
                   {contestLists.completed.map(c => (
-                    <div key={c.id} onClick={() => handleStartContest(c)} className="relative p-5 rounded-3xl border bg-soft-gray/40 border-border-gray/50 opacity-60 transition-all active:scale-[0.98] grayscale-[0.6]">
+                    <div key={c.id} onClick={() => handleStartContest(c)} className="relative p-5 rounded-3xl border bg-soft-gray/40 border-border-gray/50 opacity-60 transition-all active:scale-[0.98] grayscale-[0.6] shadow-md">
                       <div className="flex justify-between items-start mb-4">
                         <h2 className="text-[16px] font-black uppercase text-white/40 leading-tight">{c.title}</h2>
                         <span className="text-[10px] font-black uppercase text-white/20">END</span>
@@ -629,7 +638,7 @@ const App: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-5 animate-slide-up">
-                <div className="flex items-center gap-5 p-6 bg-soft-gray/60 backdrop-blur-md rounded-3xl border border-border-gray/50 shadow-xl relative overflow-hidden">
+                <div className="flex items-center gap-5 p-6 bg-soft-gray/60 backdrop-blur-md rounded-3xl border border-border-gray/50 shadow-xl relative overflow-hidden shadow-gold/5">
                   <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-gold/5 blur-3xl rounded-full"></div>
                   {user?.photo_url ? (
                     <img src={user.photo_url} className="w-16 h-16 rounded-2xl border-2 border-gold/20 shadow-lg" alt=""/>
@@ -644,12 +653,12 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                   <div className="p-5 bg-soft-gray/60 backdrop-blur-sm rounded-3xl border border-border-gray/50 text-center shadow-lg relative overflow-hidden">
+                   <div className="p-5 bg-soft-gray/60 backdrop-blur-sm rounded-3xl border border-border-gray/50 text-center shadow-lg relative overflow-hidden active:shadow-gold/5 transition-shadow">
                       <div className="absolute inset-0 bg-white/[0.02] pointer-events-none"></div>
                       <p className="text-[11px] font-medium uppercase opacity-20 mb-2 tracking-widest">Участий</p>
                       <p className="text-[24px] font-black text-white leading-none">{profile.participationCount}</p>
                    </div>
-                   <div className="p-5 bg-soft-gray/60 backdrop-blur-sm rounded-3xl border border-border-gray/50 text-center shadow-lg relative overflow-hidden">
+                   <div className="p-5 bg-soft-gray/60 backdrop-blur-sm rounded-3xl border border-border-gray/50 text-center shadow-lg relative overflow-hidden active:shadow-gold/10 transition-shadow">
                       <div className="absolute inset-0 bg-gold/[0.02] pointer-events-none"></div>
                       <p className="text-[11px] font-medium uppercase opacity-20 mb-2 tracking-widest text-gold">Выигрыш</p>
                       <p className="text-[24px] font-black text-gold leading-none">{convert(profile.totalWon)} {CURRENCIES[currency].symbol}</p>
@@ -661,12 +670,12 @@ const App: React.FC = () => {
         )}
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-matte-black/95 backdrop-blur-2xl border-t border-border-gray/50 px-6 py-2 pb-5 flex justify-around z-[90] shadow-2xl shrink-0">
-        <button onClick={() => { setActiveTab('contests'); setView('user'); }} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${activeTab === 'contests' && view === 'user' ? 'text-gold' : 'opacity-20'}`}>
+      <nav className="fixed bottom-0 left-0 right-0 bg-matte-black/95 backdrop-blur-2xl border-t border-border-gray/50 px-6 py-2 pb-5 flex justify-around z-[90] shadow-[0_-10px_30px_rgba(0,0,0,0.5)] shrink-0 shadow-gold/5">
+        <button onClick={() => { setActiveTab('contests'); setView('user'); }} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${activeTab === 'contests' && view === 'user' ? 'text-gold drop-shadow-[0_0_8px_rgba(197,160,89,0.3)]' : 'opacity-20'}`}>
           <GiftIcon className="w-5 h-5"/>
           <span className="text-[9px] font-black uppercase tracking-widest">РОЗЫГРЫШИ</span>
         </button>
-        <button onClick={() => { setActiveTab('profile'); setView('user'); }} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${activeTab === 'profile' ? 'text-gold' : 'opacity-20'}`}>
+        <button onClick={() => { setActiveTab('profile'); setView('user'); }} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${activeTab === 'profile' ? 'text-gold drop-shadow-[0_0_8px_rgba(197,160,89,0.3)]' : 'opacity-20'}`}>
           <UserCircleIcon className="w-5 h-5"/>
           <span className="text-[9px] font-black uppercase tracking-widest">ПРОФИЛЬ</span>
         </button>
@@ -678,75 +687,75 @@ const App: React.FC = () => {
            <div className="absolute top-[-10%] right-[-10%] w-[70%] h-[50%] bg-gold/[0.07] blur-[120px] rounded-full pointer-events-none z-0"></div>
            <div className="absolute bottom-[-10%] left-[-10%] w-[60%] h-[40%] bg-gold/[0.04] blur-[100px] rounded-full pointer-events-none z-0"></div>
 
-           <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="absolute top-6 left-6 p-2 bg-soft-gray/90 backdrop-blur-md rounded-xl border border-border-gray/50 text-gold active:scale-90 transition-all shadow-xl z-[110]">
+           <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="absolute top-6 left-6 p-2 bg-soft-gray/90 backdrop-blur-md rounded-xl border border-border-gray/50 text-gold active:scale-90 transition-all shadow-xl z-[110] shadow-gold/5">
              <ChevronLeftIcon className="w-5 h-5"/>
            </button>
            
            <div className="flex-1 flex flex-col justify-center items-center text-center space-y-10 py-10 relative z-[105]">
               {step === ContestStep.REFERRAL && (
                 <div className="w-full max-w-[320px] space-y-8 animate-pop">
-                  <div className="w-20 h-20 bg-gold/10 rounded-[40px] flex items-center justify-center border border-gold/20 mx-auto shadow-lg relative overflow-hidden group">
+                  <div className="w-20 h-20 bg-gold/10 rounded-[40px] flex items-center justify-center border border-gold/20 mx-auto shadow-lg relative overflow-hidden group shadow-gold/5">
                     <div className="absolute inset-0 bg-gold/10 blur-xl opacity-50 group-hover:opacity-100 transition-opacity"></div>
                     <LinkIcon className="w-10 h-10 text-gold relative z-10"/>
                   </div>
                   <div className="space-y-3">
-                    <h2 className="text-3xl font-black uppercase tracking-tighter text-white leading-none">Проверка</h2>
+                    <h2 className="text-3xl font-black uppercase tracking-tighter text-white leading-none drop-shadow-md">Проверка</h2>
                     <p className="text-[14px] uppercase font-bold opacity-30 tracking-widest px-4 font-light leading-relaxed">Для участия подтвердите активность в проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
                   </div>
-                  {refError && <div className="p-5 bg-red-500/10 border border-red-500/30 rounded-3xl animate-shake"><p className="text-[13px] font-black text-red-500 uppercase leading-relaxed">{refError}</p></div>}
+                  {refError && <div className="p-5 bg-red-500/10 border border-red-500/30 rounded-3xl animate-shake shadow-lg shadow-red-500/5"><p className="text-[13px] font-black text-red-500 uppercase leading-relaxed">{refError}</p></div>}
                   <div className="space-y-4">
-                    <button onClick={() => window.open(presets.find(p => p.id === selectedContest?.projectId)?.referralLink, '_blank')} className="w-full py-4 bg-soft-gray text-gold border border-gold/20 font-black uppercase text-[12px] rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-md backdrop-blur-md hover:bg-gold/5"><ArrowTopRightOnSquareIcon className="w-5 h-5"/>Открыть проект</button>
-                    <button onClick={handleRefCheck} disabled={isRefChecking} className="w-full py-5 bg-gold text-matte-black font-black uppercase text-[14px] rounded-3xl shadow-lg active:translate-y-1 transition-all flex items-center justify-center gap-4 disabled:opacity-50">{isRefChecking ? <ArrowPathIcon className="w-6 h-6 animate-spin"/> : "Проверить регистрацию"}</button>
+                    <button onClick={() => window.open(presets.find(p => p.id === selectedContest?.projectId)?.referralLink, '_blank')} className="w-full py-4 bg-soft-gray text-gold border border-gold/20 font-black uppercase text-[12px] rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-md backdrop-blur-md hover:bg-gold/5 shadow-gold/5"><ArrowTopRightOnSquareIcon className="w-5 h-5"/>Открыть проект</button>
+                    <button onClick={handleRefCheck} disabled={isRefChecking} className="w-full py-5 bg-gold text-matte-black font-black uppercase text-[14px] rounded-3xl shadow-lg active:translate-y-1 transition-all flex items-center justify-center gap-4 disabled:opacity-50 shadow-gold/20">{isRefChecking ? <ArrowPathIcon className="w-6 h-6 animate-spin"/> : "Проверить регистрацию"}</button>
                   </div>
                 </div>
               )}
 
               {step === ContestStep.SUCCESS && selectedContest?.isCompleted && (
                 <div className="w-full max-w-[400px] space-y-8 animate-fade-in flex flex-col items-center">
-                   <div className="w-16 h-16 bg-gold/10 rounded-3xl flex items-center justify-center border border-gold/20 shadow-xl mb-2 relative group overflow-hidden">
+                   <div className="w-16 h-16 bg-gold/10 rounded-3xl flex items-center justify-center border border-gold/20 shadow-xl mb-2 relative group overflow-hidden shadow-gold/10">
                      <div className="absolute inset-0 bg-gold/20 blur-lg animate-pulse opacity-50"></div>
                      <TrophyIcon className="w-8 h-8 text-gold relative z-10" />
                    </div>
                    <div className="space-y-2">
-                     <h2 className="text-[28px] font-black text-white tracking-tighter leading-none uppercase">Итоги розыгрыша</h2>
+                     <h2 className="text-[28px] font-black text-white tracking-tighter leading-none uppercase drop-shadow-md">Итоги розыгрыша</h2>
                      <p className="text-[13px] font-black text-gold uppercase tracking-widest">{selectedContest.title}</p>
                    </div>
                    <div className="w-full space-y-3 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar px-2">
                       {selectedContest.winners?.map((w, i) => (
-                        <div key={i} className="p-4 bg-soft-gray/50 backdrop-blur-md border border-border-gray/50 rounded-[28px] flex justify-between items-center animate-slide-up group shadow-lg relative overflow-hidden" style={{animationDelay: `${i * 0.1}s`}}>
+                        <div key={i} className="p-4 bg-soft-gray/50 backdrop-blur-md border border-border-gray/50 rounded-[28px] flex justify-between items-center animate-slide-up group shadow-lg relative overflow-hidden shadow-black/20" style={{animationDelay: `${i * 0.1}s`}}>
                           <div className="absolute top-0 left-0 w-1 h-full bg-gold/50"></div>
                           <div className="text-left space-y-1 relative z-10 flex items-center gap-3">
-                            <div className="shrink-0">{w.avatarUrl ? <img src={w.avatarUrl} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-gold/40 shadow-sm object-cover" alt=""/> : <div className="w-8 h-8 bg-matte-black/60 rounded-full flex items-center justify-center border border-gold/20"><UserIcon className="w-4 h-4 text-gold/40" /></div>}</div>
+                            <div className="shrink-0">{w.avatarUrl ? <img src={w.avatarUrl} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-gold/40 shadow-sm object-cover" alt=""/> : <div className="w-8 h-8 bg-matte-black/60 rounded-full flex items-center justify-center border border-gold/20 shadow-inner"><UserIcon className="w-4 h-4 text-gold/40" /></div>}</div>
                             <div><div className="text-[15px] font-black text-white group-hover:text-gold transition-colors tracking-tight"><BlurredWinnerName name={w.name} /></div><p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Билет #{w.ticketNumber}</p></div>
                           </div>
-                          <div className="text-right relative z-10"><p className="text-[18px] font-black text-green-500 tracking-tighter">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p></div>
+                          <div className="text-right relative z-10"><p className="text-[18px] font-black text-green-500 tracking-tighter">+{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p></div>
                         </div>
                       ))}
                    </div>
-                   <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl text-[15px] shadow-xl active:translate-y-1 transition-all uppercase tracking-widest">Назад</button>
+                   <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl text-[15px] shadow-xl active:translate-y-1 transition-all uppercase tracking-widest shadow-gold/20">Назад</button>
                 </div>
               )}
 
               {step === ContestStep.PAYOUT && (
                 <div className="w-full max-w-[340px] space-y-10 animate-pop">
                   <div className="space-y-3">
-                    <h2 className="text-3xl font-black text-white tracking-tighter leading-none uppercase">Реквизиты</h2>
+                    <h2 className="text-3xl font-black text-white tracking-tighter leading-none uppercase drop-shadow-md">Реквизиты</h2>
                     <p className="text-[13px] font-bold text-white/20 uppercase tracking-widest font-light">Куда отправить награду?</p>
                   </div>
                   
                   <div className="flex gap-4">
-                    <button onClick={() => setProfile({...profile, payoutType: 'card'})} className={`flex-1 py-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 shadow-lg ${profile.payoutType === 'card' ? 'bg-gold/10 border-gold text-gold scale-105' : 'bg-matte-black border-border-gray text-white/10 opacity-50'}`}>
+                    <button onClick={() => setProfile({...profile, payoutType: 'card'})} className={`flex-1 py-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 shadow-lg ${profile.payoutType === 'card' ? 'bg-gold/10 border-gold text-gold scale-105 shadow-gold/20' : 'bg-matte-black border-border-gray text-white/10 opacity-50 shadow-black/40'}`}>
                       <CreditCardIcon className="w-8 h-8"/>
                       <span className="text-[12px] font-black uppercase tracking-widest">Карта</span>
                     </button>
-                    <button onClick={() => setProfile({...profile, payoutType: 'trc20'})} className={`flex-1 py-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 shadow-lg ${profile.payoutType === 'trc20' ? 'bg-gold/10 border-gold text-gold scale-105' : 'bg-matte-black border-border-gray text-white/10 opacity-50'}`}>
+                    <button onClick={() => setProfile({...profile, payoutType: 'trc20'})} className={`flex-1 py-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 shadow-lg ${profile.payoutType === 'trc20' ? 'bg-gold/10 border-gold text-gold scale-105 shadow-gold/20' : 'bg-matte-black border-border-gray text-white/10 opacity-50 shadow-black/40'}`}>
                       <BanknotesIcon className="w-8 h-8"/>
                       <span className="text-[12px] font-black uppercase tracking-widest">TRC-20</span>
                     </button>
                   </div>
                   
                   {profile.payoutType === 'card' ? (
-                    <div className="relative w-full aspect-[1.6/1] bg-gradient-to-br from-[#1c1c1e] to-[#0d0d0d] rounded-[32px] border border-gold/40 p-8 text-left shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden group">
+                    <div className="relative w-full aspect-[1.6/1] bg-gradient-to-br from-[#1c1c1e] to-[#0d0d0d] rounded-[32px] border border-gold/40 p-8 text-left shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden group shadow-gold/5">
                       {/* Card Glow */}
                       <div className="absolute top-[-20%] right-[-10%] w-40 h-40 bg-gold/5 blur-[60px] rounded-full group-hover:bg-gold/10 transition-all"></div>
                       
@@ -767,7 +776,7 @@ const App: React.FC = () => {
                           placeholder="0000 0000 0000 0000" 
                           value={profile.payoutValue} 
                           onChange={e => setProfile({...profile, payoutValue: formatCard(e.target.value)})}
-                          className="relative w-full bg-white/5 hover:bg-white/10 focus:bg-white/[0.08] px-4 py-4 rounded-2xl border border-white/5 focus:border-gold/40 transition-all font-mono text-[18px] text-white font-black tracking-wider outline-none placeholder:text-white/10"
+                          className="relative w-full bg-white/5 hover:bg-white/10 focus:bg-white/[0.08] px-4 py-4 rounded-2xl border border-white/5 focus:border-gold/40 transition-all font-mono text-[18px] text-white font-black tracking-wider outline-none placeholder:text-white/10 shadow-inner"
                         />
                       </div>
 
@@ -796,55 +805,55 @@ const App: React.FC = () => {
                   <button 
                     onClick={handleFinalizeParticipation}
                     disabled={profile.payoutType === 'card' ? !isValidLuhn(profile.payoutValue) : !profile.payoutValue}
-                    className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl text-[16px] shadow-2xl disabled:opacity-20 transition-all active:scale-95 flex items-center justify-center gap-3 uppercase tracking-widest"
+                    className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl text-[16px] shadow-2xl disabled:opacity-20 transition-all active:scale-95 flex items-center justify-center gap-3 uppercase tracking-widest shadow-gold/20"
                   >
                     Занять место
                   </button>
                   {profile.payoutType === 'card' && profile.payoutValue.replace(/\s/g, '').length >= 13 && !isValidLuhn(profile.payoutValue) && (
-                    <p className="text-red-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-1 animate-pulse"><ShieldExclamationIcon className="w-4 h-4"/> Ошибка алгоритма Луна</p>
+                    <p className="text-red-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-1 animate-pulse"><ShieldExclamationIcon className="w-4 h-4"/> Проверьте корректность номера карты</p>
                   )}
                 </div>
               )}
 
               {step === ContestStep.TICKET_SHOW && (
                 <div className="w-full max-w-[340px] space-y-12 animate-pop relative py-10">
-                   <div className="bg-deep-gray text-white rounded-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col relative border border-gold/30">
+                   <div className="bg-deep-gray text-white rounded-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col relative border border-gold/30 shadow-gold/5">
                       <div className="absolute top-[-15px] left-1/2 -translate-x-1/2 w-10 h-8 bg-matte-black rounded-full z-10 border border-gold/20 shadow-lg"></div>
                       
                       <div className="p-8 pb-4 border-b-2 border-dashed border-gold/20 relative bg-soft-gray/30">
                         <div className="absolute inset-0 bg-gold/[0.03] blur-2xl pointer-events-none"></div>
                         <div className="flex justify-between items-center mb-6 relative z-10">
                           <div className="flex items-center gap-2">
-                            <QrCodeIcon className="w-6 h-6 text-gold" />
+                            <QrCodeIcon className="w-6 h-6 text-gold drop-shadow-sm" />
                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold/60">BEEF • TICKET</span>
                           </div>
                           <span className="text-[10px] font-black text-gold/40">#{selectedContest?.id.slice(-6)}</span>
                         </div>
-                        <h3 className="text-[20px] font-black uppercase mb-1 text-white tracking-tight relative z-10">{selectedContest?.title}</h3>
+                        <h3 className="text-[20px] font-black uppercase mb-1 text-white tracking-tight relative z-10 drop-shadow-md">{selectedContest?.title}</h3>
                         <p className="text-[11px] text-white/30 font-bold uppercase tracking-widest relative z-10">Участие подтверждено</p>
                       </div>
 
-                      <div className="p-10 flex flex-col items-center justify-center relative bg-matte-black/40">
+                      <div className="p-10 flex flex-col items-center justify-center relative bg-matte-black/40 shadow-inner">
                         <div className="absolute top-1/2 -left-4 -translate-y-1/2 w-8 h-8 bg-matte-black rounded-full border-r border-gold/20 shadow-inner"></div>
                         <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-8 h-8 bg-matte-black rounded-full border-l border-gold/20 shadow-inner"></div>
 
-                        <span className="text-[12px] font-black text-gold/40 uppercase tracking-[0.6em] mb-6">ВАШ НОМЕР</span>
+                        <span className="text-[12px] font-black text-gold/40 uppercase tracking-[0.6em] mb-6 drop-shadow-sm">ВАШ НОМЕР</span>
                         <h1 className="text-[90px] font-black italic text-white tracking-tighter leading-none select-none drop-shadow-[0_4px_12px_rgba(197,160,89,0.4)]">#{userTicket}</h1>
                         
-                        <div className="mt-10 flex items-center gap-3 px-6 py-2.5 bg-gold/5 rounded-full border border-gold/30 backdrop-blur-md shadow-lg">
+                        <div className="mt-10 flex items-center gap-3 px-6 py-2.5 bg-gold/5 rounded-full border border-gold/30 backdrop-blur-md shadow-lg shadow-gold/5">
                           <CheckBadgeIcon className="w-5 h-5 text-gold-light" />
                           <span className="text-[12px] font-black text-gold-light uppercase tracking-widest">АКТИВЕН</span>
                         </div>
                       </div>
 
-                      <div className="h-8 bg-matte-black/80 flex items-center justify-center gap-1 px-8">
+                      <div className="h-8 bg-matte-black/80 flex items-center justify-center gap-1 px-8 opacity-40">
                          {[...Array(30)].map((_, i) => (
                            <div key={i} className="bg-gold/10 h-full" style={{ width: Math.random() * 3 + 1 + 'px' }}></div>
                          ))}
                       </div>
                    </div>
 
-                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-6 bg-matte-black/60 border-2 border-gold/30 rounded-3xl text-[14px] font-black uppercase text-gold active:bg-gold/20 transition-all shadow-2xl backdrop-blur-md relative z-20">На главную</button>
+                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-6 bg-matte-black/60 border-2 border-gold/30 rounded-3xl text-[14px] font-black uppercase text-gold active:bg-gold/20 transition-all shadow-2xl backdrop-blur-md relative z-20 shadow-gold/10">На главную</button>
                 </div>
               )}
            </div>
