@@ -755,6 +755,10 @@ const App: React.FC = () => {
                             </div>
                           )}
 
+                          <div className="mt-6 w-full py-4 bg-gold text-matte-black font-black rounded-2xl text-[13px] uppercase text-center shadow-xl shadow-gold/20 relative z-10 transition-transform active:scale-95">
+                             {isParticipating ? 'ПЕРЕЙТИ В РОЗЫГРЫШ' : 'УЧАСТВОВАТЬ'}
+                          </div>
+
                           {isAdmin && (
                             <button 
                               onClick={(e) => { e.stopPropagation(); autoFinish(c.id, contests, avatars); }}
