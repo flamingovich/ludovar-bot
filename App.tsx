@@ -33,7 +33,8 @@ import {
   QrCodeIcon,
   FaceFrownIcon,
   ShieldExclamationIcon,
-  XCircleIcon
+  XCircleIcon,
+  ShieldCheckIcon as ShieldCheckSolid
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -77,7 +78,7 @@ const MALE_NAMES_EN = [
   "Ryan", "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank", "Scott", "Justin", "Brandon",
   "Raymond", "Gregory", "Samuel", "Benjamin", "Patrick", "Jack", "Alexander", "Dennis", "Jerry", "Tyler",
   "Aaron", "Adam", "Alan", "Albert", "Austin", "Billy", "Bobby", "Bradley", "Bruce", "Bryan", "Carl",
-  "Christian", "Craig", "Curtis", "Douglas", "Dylan", "Ethan", "Eugene", "Gabriel", "Harold", "Henry",
+  "Christian", "Craig", "Curtis", "Douglas", "Dylan", "Ethan", "Eugene", "Gabriel", "Harold", " Henry",
   "Isaac", "Jeremy", "Jordan", "Keith", "Kyle", "Logan", "Louis", "Nathan", "Noah", "Oscar", "Philip"
 ];
 
@@ -243,7 +244,8 @@ const App: React.FC = () => {
     participationCount: 0, 
     totalWon: 0, 
     savedPayouts: [],
-    participatedContests: {}
+    participatedContests: {},
+    verifiedProjects: []
   });
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
   const [currency, setCurrency] = useState<Currency>('RUB');
@@ -450,7 +452,9 @@ const App: React.FC = () => {
       return;
     }
 
-    if (profile.participationCount > 0) {
+    // Проверка регистрации по ID проекта
+    const isVerifiedForThisProject = profile.verifiedProjects?.includes(c.projectId);
+    if (isVerifiedForThisProject || profile.participationCount > 0) {
       setStep(ContestStep.PAYOUT);
       return;
     }
@@ -471,6 +475,13 @@ const App: React.FC = () => {
         setRefClickCount(prev => prev + 1);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       } else {
+        // Успешная проверка - сохраняем ID проекта в список верифицированных
+        if (selectedContest) {
+            const newVerified = Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]));
+            const newProfile = { ...profile, verifiedProjects: newVerified };
+            setProfile(newProfile);
+            localStorage.setItem(PROFILE_KEY, JSON.stringify(newProfile));
+        }
         setStep(ContestStep.PAYOUT);
         setRefClickCount(0);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
@@ -503,7 +514,9 @@ const App: React.FC = () => {
       ...profile, 
       participationCount: profile.participationCount + 1,
       savedPayouts: newSaved.slice(-5),
-      participatedContests: { ...profile.participatedContests, [selectedContest.id]: myTicket }
+      participatedContests: { ...profile.participatedContests, [selectedContest.id]: myTicket },
+      // На всякий случай дублируем здесь добавление проекта в верифицированные
+      verifiedProjects: Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]))
     };
     setProfile(newProfile);
     localStorage.setItem(PROFILE_KEY, JSON.stringify(newProfile));
@@ -545,7 +558,6 @@ const App: React.FC = () => {
 
   const contestLists = useMemo(() => {
     const now = Date.now();
-    // Важно: если expiresAt === null, конкурс считается активным до ручного завершения
     const active = contests.filter(c => !c.isCompleted && (!c.expiresAt || c.expiresAt > now));
     const completed = contests.filter(c => c.isCompleted || (c.expiresAt && c.expiresAt <= now));
     return { active, completed };
@@ -562,7 +574,7 @@ const App: React.FC = () => {
         <div className="absolute top-[-20%] right-[-10%] w-[40%] h-[150%] bg-gold/5 blur-[50px] rounded-full pointer-events-none animate-glow-slow"></div>
         <div className="flex justify-between items-center mb-5 relative z-10">
           <div className="flex items-center gap-3">
-            <h1 className="text-[13px] font-black uppercase tracking-tight text-gradient-gold drop-shadow-sm">РОЗЫГРЫШИ ОТ ЛУДОВАРА</h1>
+            <h1 className="text-[18px] font-black uppercase tracking-tight text-gradient-gold drop-shadow-sm">РОЗЫГРЫШИ ОТ ЛУДОВАРА</h1>
             <div className="relative inline-block">
               <select 
                 value={currency} 
@@ -840,7 +852,7 @@ const App: React.FC = () => {
                      <h2 className="text-[28px] font-black text-white tracking-tighter leading-none uppercase drop-shadow-md">Итоги розыгрыша</h2>
                      <p className="text-[13px] font-black text-gradient-gold uppercase tracking-widest">{selectedContest.title}</p>
                    </div>
-                   <div className="w-full space-y-3 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar px-2">
+                   <div className="w-full space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar px-2">
                       {selectedContest.winners?.map((w, i) => (
                         <div key={i} className="p-4 bg-soft-gray/50 backdrop-blur-md border border-border-gray/50 rounded-[28px] flex justify-between items-center animate-slide-up group shadow-lg relative overflow-hidden shadow-black/20" style={{animationDelay: `${i * 0.1}s`}}>
                           <div className="absolute top-0 left-0 w-1 h-full bg-gold/50"></div>
@@ -870,6 +882,24 @@ const App: React.FC = () => {
                         </div>
                       ))}
                    </div>
+                   
+                   {/* Provably Fair Section */}
+                   <div className="w-full max-w-[340px] p-5 bg-matte-black/60 rounded-[32px] border border-gold/20 backdrop-blur-xl space-y-3 relative overflow-hidden group shadow-xl">
+                      <div className="absolute top-[-20%] right-[-20%] w-20 h-20 bg-gold/5 blur-3xl"></div>
+                      <div className="flex items-center gap-2 text-gold/60 border-b border-gold/10 pb-3">
+                        <ShieldCheckSolid className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Provably Fair Verification</span>
+                      </div>
+                      <div className="space-y-1.5 text-left">
+                        <p className="text-[9px] font-black uppercase text-white/20 tracking-widest">Generation Seed</p>
+                        <div className="p-3 bg-white/[0.03] rounded-xl border border-white/5 relative group/seed cursor-pointer active:scale-[0.98] transition-transform" onClick={() => { if(selectedContest.seed) { navigator.clipboard.writeText(selectedContest.seed); window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light'); }}}>
+                          <p className="text-[8px] font-mono text-white/40 break-all leading-tight pr-6">{selectedContest.seed || 'pending_generation_...'}</p>
+                          <ClipboardDocumentIcon className="w-3 h-3 text-white/10 absolute right-3 top-1/2 -translate-y-1/2 group-hover/seed:text-gold transition-colors" />
+                        </div>
+                        <p className="text-[8px] text-white/10 font-bold leading-relaxed mt-2 uppercase">Результаты были выбраны с использованием криптографического сида. Это гарантирует отсутствие вмешательства в выбор победителей.</p>
+                      </div>
+                   </div>
+
                    <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl text-[15px] shadow-xl active:translate-y-1 transition-all uppercase tracking-widest shadow-gold/20">Назад</button>
                 </div>
               )}

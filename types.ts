@@ -22,6 +22,7 @@ export interface UserProfile {
   totalWon: number;
   savedPayouts: Array<{ type: PayoutType; value: string }>;
   participatedContests: Record<string, number>; // contestId -> ticketNumber
+  verifiedProjects?: string[]; // Список ID проектов, где пройдена регистрация
 }
 
 export interface ProjectPreset {
