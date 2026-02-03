@@ -13,7 +13,7 @@ export default async function handler(req: Request) {
   if (!BOT_TOKEN) return new Response('Bot Token Not Set', { status: 500 });
 
   try {
-    const { title, prize, winners } = await req.json();
+    const { title, prize, winners, duration } = await req.json();
 
     // 1. Получаем список ID всех пользователей из Upstash
     const res = await fetch(`${KV_REST_API_URL}/get/${USERS_LIST_KEY}`, {
@@ -24,8 +24,8 @@ export default async function handler(req: Request) {
 
     if (userIds.length === 0) return new Response('No users', { status: 200 });
 
-    // 2. Рассылаем сообщения
-    const text = `🎁 *НОВЫЙ РОЗЫГРЫШ ОТ ЛУДОВАРА!*\n\n🏆 *${title}*\n💰 Приз: *${prize}*\n👥 Мест: *${winners}*\n\nЗаходи скорее, пока есть места! 👇`;
+    // 2. Рассылаем сообщения в новом формате
+    const text = `🎁 *НОВЫЙ РОЗЫГРЫШ!*\n\n🏆 *${title}*\n💰 Приз: *${prize}*\n👥 Призовых Мест: *${winners}*\n⏰ Итоги через *${duration}*\n\nЗаходи скорее, пока есть время! 👇`;
     
     const sendPromises = userIds.map(userId => {
       const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;

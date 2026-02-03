@@ -447,13 +447,15 @@ const App: React.FC = () => {
 
     // Вызов API для автоматической рассылки уведомлений
     try {
+      const durationLabel = DURATION_OPTIONS.find(opt => opt.value === newDuration)?.label || 'не указано';
       fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTitle,
           prize: `${parseInt(newPrize)}₽`,
-          winners: newWinners
+          winners: newWinners,
+          duration: durationLabel
         })
       });
     } catch (e) { console.error("Notification trigger failed", e); }
