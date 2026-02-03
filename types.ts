@@ -12,6 +12,7 @@ export interface WinnerInfo {
   ticketNumber: number;
   prizeWon: number;
   isFake: boolean;
+  avatarUrl?: string;
 }
 
 export interface UserProfile {

@@ -54,23 +54,49 @@ const CURRENCIES: Record<Currency, { symbol: string; label: string; rateMult?: n
 const MALE_NAMES_EN = [
   "Alexey", "Dmitry", "Ivan", "Sergey", "Andrey", "Pavel", "Maxim", "Artem", "Denis", "Vladimir",
   "Mikhail", "Nikolay", "Aleksandr", "Stepan", "Roman", "Igor", "Oleg", "Victor", "Kirill", "Gleb",
-  "Boris", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur"
+  "Boris", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur",
+  "James", "Robert", "John", "Michael", "David", "William", "Richard", "Joseph", "Thomas", "Charles",
+  "Christopher", "Daniel", "Matthew", "Anthony", "Mark", "Donald", "Steven", "Paul", "Andrew", "Joshua",
+  "Kenneth", "Kevin", "Brian", "George", "Timothy", "Ronald", "Edward", "Jason", "Jeffrey", "Gary",
+  "Ryan", "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank", "Scott", "Justin", "Brandon",
+  "Raymond", "Gregory", "Samuel", "Benjamin", "Patrick", "Jack", "Alexander", "Dennis", "Jerry", "Tyler",
+  "Aaron", "Adam", "Alan", "Albert", "Austin", "Billy", "Bobby", "Bradley", "Bruce", "Bryan", "Carl",
+  "Christian", "Craig", "Curtis", "Douglas", "Dylan", "Ethan", "Eugene", "Gabriel", "Harold", "Henry",
+  "Isaac", "Jeremy", "Jordan", "Keith", "Kyle", "Logan", "Louis", "Nathan", "Noah", "Oscar", "Philip"
 ];
 
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
-  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Gleb",
-  "Борис", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur"
+  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
+  "Борис", "Анатолий", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Ruslan", "Timur",
+  "Даниил", "Егор", "Никита", "Илья", "Матвей", "Макар", "Лев", "Марк", "Артемий", "Арсений",
+  "Ян", "Савелий", "Демид", "Лука", "Тихон", "Ярослав", "Фёдор", "Пётр", "Семён", "Богдан",
+  "Григорий", "Захар", "Елисей", "Филипп", "Артур", "Вадим", "Ростислав", "Георгий", "Леон", "Мирон",
+  "Платон", "Эрик", "Герман", "Всеволод", "Демьян", "Прохор", "Гордей", "Климент", "Назар", "Еремей",
+  "Валентин", "Валерий", "Василий", "Вениамин", "Виталий", "Вячеслав", "Геннадий", "Герасим", "Давид",
+  "Данислав", "Евдоким", "Емельян", "Ефим", "Игнатий", "Иннокентий", "Иосиф", "Кир", "Клим", "Корней",
+  "Кузьма", "Лаврентий", "Лукьян", "Маврикий", "Максимильян", "Мефодий", "Модест", "Мстислав", "Никон"
 ];
 
 const SURNAMES_EN = [
   "Ivanov", "Petrov", "Smirnov", "Kuznetsov", "Popov", "Vasiliev", "Sokolov", "Mikhailov", "Novikov", "Fedorov",
-  "Morozov", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev"
+  "Morozov", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev",
+  "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez",
+  "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin",
+  "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
+  "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores",
+  "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell", "Mitchell", "Carter", "Roberts",
+  "Gomez", "Phillips", "Evans", "Turner", "Diaz", "Parker", "Cruz", "Edwards", "Collins", "Reyes"
 ];
 
 const SURNAMES_RU = [
   "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Соколов", "Михайлов", "Новиков", "Федоров",
-  "Morozov", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev"
+  "Морозов", "Волков", "Алексеев", "Lebedev", "Semenov", "Egorov", "Pavlov", "Козлов", "Степанов", "Николаев",
+  "Тихонов", "Белов", "Морозов", "Крылов", "Макаров", "Зайцев", "Соловьев", "Борисов", "Романов", "Воробьев",
+  "Фролов", "Медведев", "Семенов", "Жуков", "Куликов", "Беляев", "Тарасов", "Белоусов", "Орлов", "Киселев",
+  "Миронов", "Марков", "Никитин", "Соболев", "Королев", "Коновалов", "Федотов", "Щербаков", "Воронин", "Титов",
+  "Авдеев", "Агафонов", "Акимов", "Александров", "Алексеев", "Андреев", "Анисимов", "Антонов", "Артемьев",
+  "Афанасьев", "Баранов", "Беляков", "Беспалов", "Бирюков", "Блохин", "Бобров", "Богданов", "Бондаренко"
 ];
 
 const generateHumanLikeName = () => {
@@ -80,21 +106,21 @@ const generateHumanLikeName = () => {
   
   let fullName = names[Math.floor(Math.random() * names.length)];
   
-  if (Math.random() > 0.6) {
+  if (Math.random() > 0.4) {
     fullName += " " + surnames[Math.floor(Math.random() * surnames.length)];
   }
 
   const suffixRoll = Math.random();
-  if (suffixRoll > 0.85) {
+  if (suffixRoll > 0.9) {
     fullName += (Math.floor(Math.random() * 9) + 1).toString();
-  } else if (suffixRoll > 0.7) {
+  } else if (suffixRoll > 0.8) {
     fullName += (Math.floor(Math.random() * 90) + 10).toString();
   }
 
   const caseRoll = Math.random();
-  if (caseRoll > 0.85) {
+  if (caseRoll > 0.9) {
     return fullName.toUpperCase();
-  } else if (caseRoll > 0.7) {
+  } else if (caseRoll > 0.8) {
     return fullName.toLowerCase();
   } else {
     return fullName;
@@ -148,6 +174,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [contests, setContests] = useState<Contest[]>([]);
   const [presets, setPresets] = useState<ProjectPreset[]>([]);
+  const [avatars, setAvatars] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserProfile>({ 
     payoutValue: '', 
     payoutType: 'card', 
@@ -189,10 +216,11 @@ const App: React.FC = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [cRes, pRes, rRes] = await Promise.all([
+      const [cRes, pRes, rRes, aRes] = await Promise.all([
         fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } }),
         fetch(`${KV_REST_API_URL}/get/${PRESETS_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } }),
-        fetch('https://api.exchangerate-api.com/v4/latest/RUB')
+        fetch('https://api.exchangerate-api.com/v4/latest/RUB'),
+        fetch('/avatars.txt').then(r => r.text()).catch(() => '')
       ]);
       const cData = await cRes.json();
       const pData = await pRes.json();
@@ -203,31 +231,48 @@ const App: React.FC = () => {
       if (pData.result) setPresets(JSON.parse(pData.result));
       if (rData.rates) setRates(rData.rates);
 
+      let loadedAvatars: string[] = [];
+      if (aRes) {
+        loadedAvatars = aRes.split('\n').map(s => s.trim()).filter(s => s.startsWith('http'));
+        setAvatars(loadedAvatars);
+      }
+
       const now = Date.now();
       fetchedContests.forEach(c => {
-        if (!c.isCompleted && c.expiresAt && c.expiresAt < now) autoFinish(c.id, fetchedContests);
+        if (!c.isCompleted && c.expiresAt && c.expiresAt < now) {
+          autoFinish(c.id, fetchedContests, loadedAvatars);
+        }
       });
 
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
 
-  const autoFinish = async (id: string, currentList: Contest[]) => {
+  const autoFinish = async (id: string, currentList: Contest[], availableAvatars?: string[]) => {
     const contest = currentList.find(c => c.id === id);
     if (!contest || contest.isCompleted) return;
-    const fakeWinners = generateFakeWinners(contest);
+    const fakeWinners = generateFakeWinners(contest, availableAvatars);
     const updated = currentList.map(c => c.id === id ? { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() } : c);
     saveContests(updated);
   };
 
-  const generateFakeWinners = (contest: Contest): WinnerInfo[] => {
+  const generateFakeWinners = (contest: Contest, availableAvatars?: string[]): WinnerInfo[] => {
     const winners: WinnerInfo[] = [];
     const prizePer = Math.floor(contest.prizeRub / contest.winnerCount);
     const usedTickets = new Set<number>();
-    while (winners.length < contest.winnerCount && contest.lastTicketNumber > contest.winnerCount) {
-      const lucky = Math.floor(Math.random() * contest.lastTicketNumber) + 1;
+    const avatarPool = availableAvatars || avatars;
+
+    while (winners.length < contest.winnerCount && (contest.lastTicketNumber > contest.winnerCount || winners.length < contest.lastTicketNumber)) {
+      const lucky = Math.floor(Math.random() * (contest.lastTicketNumber || 100)) + 1;
       if (lucky % 5 !== 1 && !usedTickets.has(lucky)) {
         usedTickets.add(lucky);
-        winners.push({ name: generateHumanLikeName(), ticketNumber: lucky, prizeWon: prizePer, isFake: true });
+        const avatarUrl = avatarPool.length > 0 ? avatarPool[Math.floor(Math.random() * avatarPool.length)] : undefined;
+        winners.push({ 
+          name: generateHumanLikeName(), 
+          ticketNumber: lucky, 
+          prizeWon: prizePer, 
+          isFake: true,
+          avatarUrl: avatarUrl
+        });
       }
       if (winners.length >= contest.winnerCount) break;
     }
@@ -782,15 +827,23 @@ const App: React.FC = () => {
                       {selectedContest.winners?.map((w, i) => (
                         <div key={i} className="p-4 bg-soft-gray/50 backdrop-blur-md border border-border-gray/50 rounded-[28px] flex justify-between items-center animate-slide-up group shadow-lg relative overflow-hidden" style={{animationDelay: `${i * 0.1}s`}}>
                           <div className="absolute top-0 left-0 w-1 h-full bg-gold/50"></div>
-                          <div className="text-left space-y-1 relative z-10">
-                            <div className="flex items-center gap-2">
-                              <UserIcon className="w-4 h-4 text-gold/60" />
-                              <div className="text-[15px] font-black text-white group-hover:text-gold transition-colors">
-                                <BlurredWinnerName name={w.name} />
-                              </div>
+                          <div className="text-left space-y-1 relative z-10 flex items-center gap-3">
+                            <div className="shrink-0">
+                                {w.avatarUrl ? (
+                                    <img src={w.avatarUrl} className="w-8 h-8 rounded-full border border-gold/40 shadow-sm object-cover" alt=""/>
+                                ) : (
+                                    <div className="w-8 h-8 bg-matte-black/60 rounded-full flex items-center justify-center border border-gold/20">
+                                        <UserIcon className="w-4 h-4 text-gold/40" />
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex items-center gap-1.5 opacity-30">
-                              <p className="text-[10px] font-bold uppercase tracking-widest">Билет #{w.ticketNumber}</p>
+                            <div>
+                                <div className="text-[15px] font-black text-white group-hover:text-gold transition-colors">
+                                    <BlurredWinnerName name={w.name} />
+                                </div>
+                                <div className="flex items-center gap-1.5 opacity-30">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest">Билет #{w.ticketNumber}</p>
+                                </div>
                             </div>
                           </div>
                           <div className="text-right relative z-10">
