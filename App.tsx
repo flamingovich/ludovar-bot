@@ -30,7 +30,8 @@ import {
   LockClosedIcon,
   KeyIcon,
   UserIcon,
-  QrCodeIcon
+  QrCodeIcon,
+  FaceFrownIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -58,8 +59,8 @@ const MALE_NAMES_EN = [
 
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
-  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
-  "Борис", "Анатолий", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Руслан", "Тимур"
+  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Gleb",
+  "Борис", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur"
 ];
 
 const SURNAMES_EN = [
@@ -69,11 +70,11 @@ const SURNAMES_EN = [
 
 const SURNAMES_RU = [
   "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Соколов", "Михайлов", "Новиков", "Федоров",
-  "Морозов", "Волков", "Алексеев", "Лебедев", "Семенов", "Егоров", "Павлов", "Козлов", "Степанов", "Николаев"
+  "Morozov", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev"
 ];
 
 const generateHumanLikeName = () => {
-  const isRussian = Math.random() > 0.4;
+  const isRussian = Math.random() > 0.5; // True 50/50 mix
   const names = isRussian ? MALE_NAMES_RU : MALE_NAMES_EN;
   const surnames = isRussian ? SURNAMES_RU : SURNAMES_EN;
   
@@ -91,12 +92,10 @@ const generateHumanLikeName = () => {
   }
 
   const caseRoll = Math.random();
-  if (caseRoll > 0.8) {
+  if (caseRoll > 0.85) {
     return fullName.toUpperCase();
-  } else if (caseRoll > 0.6) {
+  } else if (caseRoll > 0.7) {
     return fullName.toLowerCase();
-  } else if (caseRoll > 0.4) {
-    return fullName.split('').map((c, i) => i % 2 === 0 ? c.toUpperCase() : c.toLowerCase()).join('');
   } else {
     return fullName;
   }
@@ -338,8 +337,9 @@ const App: React.FC = () => {
     const delay = Math.floor(Math.random() * 2000) + 1000;
     setTimeout(() => {
       setIsRefChecking(false);
+      const projectName = presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект';
       if (refClickCount < 2) {
-        setRefError('Ошибка проверки. Попробуйте снова через 5 секунд');
+        setRefError(`Ошибка. Проверьте зарегистрированы ли вы на ${projectName} и попробуйте снова через 5 сек`);
         setRefClickCount(prev => prev + 1);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       } else {
@@ -403,11 +403,24 @@ const App: React.FC = () => {
       const t = setInterval(() => setTimeLeft(expiresAt - Date.now()), 1000);
       return () => clearInterval(t);
     }, [expiresAt]);
-    if (timeLeft <= 0) return <span className="text-red-500 font-bold uppercase text-[11px]">Завершен</span>;
+    if (timeLeft <= 0) return null;
     const m = Math.floor(timeLeft / 60000);
     const s = Math.floor((timeLeft % 60000) / 1000);
-    return <span className="text-gold font-mono text-[14px] font-black">{m}:{s < 10 ? '0' : ''}{s}</span>;
+    return (
+      <div className="flex items-center gap-2 bg-matte-black/40 border border-gold/40 px-3 py-2 rounded-2xl backdrop-blur-md shadow-[0_0_15px_rgba(197,160,89,0.15)] group animate-pulse-subtle">
+        <ClockIcon className="w-4 h-4 text-gold-light animate-spin-slow"/>
+        <span className="text-[16px] font-black text-gold-light font-mono tracking-wider">
+          {m}:{s < 10 ? '0' : ''}{s}
+        </span>
+      </div>
+    );
   };
+
+  const contestLists = useMemo(() => {
+    const active = contests.filter(c => !c.isCompleted && (c.expiresAt ? c.expiresAt > Date.now() : true));
+    const completed = contests.filter(c => !(!c.isCompleted && (c.expiresAt ? c.expiresAt > Date.now() : true)));
+    return { active, completed };
+  }, [contests]);
 
   return (
     <div className="h-screen bg-matte-black text-[#E2E2E6] overflow-hidden flex flex-col font-sans selection:bg-gold/30 relative">
@@ -415,7 +428,6 @@ const App: React.FC = () => {
       {/* Background Glows for Main Page */}
       <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[50%] bg-gold/5 blur-[100px] rounded-full animate-glow-slow pointer-events-none z-0"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-gold/3 blur-[80px] rounded-full animate-glow-fast pointer-events-none z-0"></div>
-      <div className="absolute top-[30%] left-[20%] w-[30%] h-[30%] bg-gold/2 blur-[60px] rounded-full animate-glow-pulse pointer-events-none z-0"></div>
 
       {/* Top Header */}
       <div className="px-4 py-5 bg-soft-gray/80 backdrop-blur-lg border-b border-border-gray z-30 shadow-xl relative overflow-hidden shrink-0">
@@ -485,78 +497,167 @@ const App: React.FC = () => {
                 </div>
                 <button onClick={handleCreateContest} className="w-full py-4 bg-gold text-matte-black font-black rounded-xl uppercase text-[12px] active:scale-95 transition-all shadow-md relative z-10">Опубликовать</button>
              </div>
+
+             <button onClick={handleClearAllContests} className="w-full py-4 border-2 border-red-500/20 text-red-500 font-black rounded-xl uppercase text-[11px] active:bg-red-500/10 transition-all mt-4 relative z-10">Очистить историю</button>
           </div>
         ) : (
           <div className="pb-24">
             {activeTab === 'contests' ? (
-              <div className="space-y-4">
-                {contests.length === 0 && (
-                  <div className="flex flex-col items-center py-20 opacity-10">
-                    <GiftIcon className="w-16 h-16 mb-4"/>
-                    <p className="text-[14px] font-black uppercase tracking-widest">Наград нет</p>
+              <div className="flex flex-col">
+                {/* Active Contests Section */}
+                <div className="space-y-4 mb-8">
+                  {contestLists.active.length === 0 ? (
+                    <div className="flex flex-col items-center py-12 px-6 bg-soft-gray/30 rounded-3xl border border-border-gray/30 backdrop-blur-sm animate-fade-in">
+                       <SparklesIcon className="w-10 h-10 text-gold/30 mb-4" />
+                       <p className="text-[11px] font-bold text-center text-white/70 uppercase tracking-widest leading-relaxed">
+                         на данный момент нет активных розыгрышей,<br/>но скоро они тут появятся :)
+                       </p>
+                    </div>
+                  ) : (
+                    contestLists.active.map(c => {
+                      const userParticipation = profile.participatedContests[c.id];
+                      const isParticipating = !!userParticipation;
+
+                      return (
+                        <div 
+                          key={c.id} 
+                          onClick={() => handleStartContest(c)}
+                          className={`relative p-5 rounded-3xl border backdrop-blur-sm transition-all active:scale-[0.98] group overflow-hidden ${
+                            isParticipating ? 'border-green-500/60 bg-soft-gray/70 ring-2 ring-green-500/10' : 'bg-soft-gray/70 border-gold/30 shadow-lg'
+                          }`}
+                        >
+                          <div className="absolute top-[-20%] left-[-10%] w-[40%] h-[40%] bg-gold/5 blur-3xl pointer-events-none group-hover:bg-gold/10 transition-all"></div>
+                          
+                          {isParticipating && (
+                            <div className="mb-3 flex items-center gap-2 text-green-500">
+                              <CheckBadgeIcon className="w-5 h-5" />
+                              <span className="text-[12px] font-black uppercase tracking-wider">Вы участвуете. Ваш Билет #{userParticipation}</span>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between items-start mb-6 relative z-10">
+                            <h2 className="text-[16px] font-black uppercase tracking-tight leading-tight pr-10 text-white">{c.title}</h2>
+                            <div className="px-3 py-1.5 bg-green-500/10 rounded-xl border border-green-500/20 flex items-center gap-2 shrink-0">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-[10px] font-black uppercase text-green-500 tracking-wider">LIVE</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-4 border-t border-border-gray/50 pt-5 relative z-10">
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-bold uppercase opacity-30 tracking-widest font-light text-white">Фонд</p>
+                              <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
+                                <BanknotesIcon className="w-4 h-4 text-gold" />
+                                <p className="text-[17px] font-black tracking-tight text-gold-light">
+                                  {convert(c.prizeRub)} {CURRENCIES[currency].symbol}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="space-y-1 text-center">
+                              <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest font-light text-white">Мест</p>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <TrophyIcon className="w-4 h-4 text-white/40" />
+                                <p className="text-[14px] font-black text-white">{c.winnerCount}</p>
+                              </div>
+                            </div>
+                            <div className="space-y-1 text-right">
+                              <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest font-light text-white">Билетов</p>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <TicketIcon className="w-4 h-4 text-white/40" />
+                                <p className="text-[14px] font-black text-white">{c.participantCount}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {c.expiresAt && (
+                            <div className="mt-5 relative z-10 flex flex-col gap-2">
+                               <div className="flex items-center justify-between">
+                                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30">Осталось времени:</p>
+                                  <Countdown expiresAt={c.expiresAt}/>
+                               </div>
+                            </div>
+                          )}
+
+                          {isAdmin && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); finishContestManually(c.id); }}
+                              className="mt-5 w-full py-4 bg-matte-black/60 border border-gold/40 rounded-2xl text-[12px] font-black uppercase text-gold active:bg-gold/20 transition-all shadow-lg"
+                            >Завершить досрочно</button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Separator / Completed Header */}
+                {contestLists.completed.length > 0 && (
+                  <div className="flex items-center gap-4 py-4 mb-4">
+                    <div className="h-[1px] flex-1 bg-border-gray/50"></div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Завершенные</span>
+                    <div className="h-[1px] flex-1 bg-border-gray/50"></div>
                   </div>
                 )}
-                {contests.map(c => {
-                  const isActive = !c.isCompleted && (c.expiresAt ? c.expiresAt > Date.now() : true);
-                  return (
-                    <div 
-                      key={c.id} 
-                      onClick={() => handleStartContest(c)}
-                      className={`relative p-5 rounded-3xl border backdrop-blur-sm transition-all active:scale-[0.98] group overflow-hidden ${
-                        isActive 
-                        ? 'bg-soft-gray/70 border-gold/30 shadow-lg ring-1 ring-gold/5' 
-                        : 'bg-soft-gray/40 border-border-gray/50 opacity-80'
-                      }`}
-                    >
-                      {isActive && <div className="absolute top-[-20%] left-[-10%] w-[40%] h-[40%] bg-gold/5 blur-3xl pointer-events-none group-hover:bg-gold/10 transition-all"></div>}
-                      <div className="flex justify-between items-start mb-6 relative z-10">
-                        <h2 className="text-[16px] font-black text-white uppercase tracking-tight leading-tight pr-10">{c.title}</h2>
-                        {isActive ? (
-                          <div className="px-3 py-1.5 bg-green-500/10 rounded-xl border border-green-500/20 flex items-center gap-2 shrink-0">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]"></div>
-                            <span className="text-[10px] font-black uppercase text-green-500 tracking-wider">LIVE</span>
-                          </div>
-                        ) : (
-                          <div className="px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 shrink-0 flex items-center gap-1.5">
-                            <ClockIcon className="w-3.5 h-3.5 text-white/30" />
-                            <span className="text-[10px] font-black uppercase text-white/30">END</span>
+
+                {/* Completed Contests Section */}
+                <div className="space-y-4">
+                  {contestLists.completed.map(c => {
+                    const userParticipation = profile.participatedContests[c.id];
+                    const isParticipating = !!userParticipation;
+                    const isWinner = c.winners?.some(w => w.ticketNumber === userParticipation);
+
+                    return (
+                      <div 
+                        key={c.id} 
+                        onClick={() => handleStartContest(c)}
+                        className={`relative p-5 rounded-3xl border backdrop-blur-sm transition-all active:scale-[0.98] group overflow-hidden ${
+                          isParticipating && !isWinner ? 'border-red-900/40 bg-soft-gray/30 grayscale-[0.3]' : 'bg-soft-gray/40 border-border-gray/50 opacity-60 grayscale-[0.6]'
+                        }`}
+                      >
+                        {isParticipating && !isWinner && (
+                          <div className="mb-3 flex items-center gap-2 text-red-700">
+                            <FaceFrownIcon className="w-5 h-5" />
+                            <span className="text-[12px] font-black uppercase tracking-wider">Вы не выиграли :(</span>
                           </div>
                         )}
-                      </div>
 
-                      <div className="grid grid-cols-3 gap-4 border-t border-border-gray/50 pt-5 relative z-10">
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest font-light">Банк</p>
-                          <div className="flex items-center gap-1.5">
-                            <BanknotesIcon className="w-4 h-4 text-gold/60" />
-                            <p className="text-[14px] font-black text-gold">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
+                        <div className="flex justify-between items-start mb-6 relative z-10">
+                          <h2 className="text-[16px] font-black uppercase tracking-tight leading-tight pr-10 text-white/40">{c.title}</h2>
+                          <div className="px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 shrink-0 flex items-center gap-1.5 opacity-30">
+                            <ClockIcon className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-black uppercase">END</span>
                           </div>
                         </div>
-                        <div className="space-y-1 text-center">
-                          <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest font-light">Мест</p>
-                          <div className="flex items-center justify-center gap-1.5">
-                            <TrophyIcon className="w-4 h-4 text-white/30" />
-                            <p className="text-[14px] font-black text-white">{c.winnerCount}</p>
+
+                        <div className="grid grid-cols-3 gap-4 border-t border-border-gray/50 pt-5 relative z-10">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold uppercase opacity-30 tracking-widest font-light text-white/40">Фонд</p>
+                            <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
+                              <BanknotesIcon className="w-4 h-4 text-gold/30" />
+                              <p className="text-[17px] font-black tracking-tight text-gold-light/30">
+                                {convert(c.prizeRub)} {CURRENCIES[currency].symbol}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="space-y-1 text-right">
-                          <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest font-light">Билетов</p>
-                          <div className="flex items-center justify-end gap-1.5">
-                            <TicketIcon className="w-4 h-4 text-white/30" />
-                            <p className="text-[14px] font-black text-white">{c.participantCount}</p>
+                          <div className="space-y-1 text-center">
+                            <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest font-light text-white/40">Мест</p>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <TrophyIcon className="w-4 h-4 text-white/10" />
+                              <p className="text-[14px] font-black text-white/30">{c.winnerCount}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-right">
+                            <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest font-light text-white/40">Билетов</p>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <TicketIcon className="w-4 h-4 text-white/10" />
+                              <p className="text-[14px] font-black text-white/30">{c.participantCount}</p>
+                            </div>
                           </div>
                         </div>
                       </div>
-
-                      {isActive && c.expiresAt && (
-                        <div className="mt-5 flex items-center gap-3 text-[12px] font-medium text-white/40 uppercase relative z-10">
-                          <ClockIcon className="w-4 h-4 text-gold/60"/>
-                          <Countdown expiresAt={c.expiresAt}/>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <div className="space-y-5 animate-slide-up">
@@ -579,12 +680,10 @@ const App: React.FC = () => {
                    <div className="p-5 bg-soft-gray/60 backdrop-blur-sm rounded-3xl border border-border-gray/50 text-center shadow-lg relative overflow-hidden group">
                       <p className="text-[11px] font-medium uppercase opacity-20 mb-2 tracking-widest font-light">Участий</p>
                       <p className="text-[24px] font-black text-white leading-none">{profile.participationCount}</p>
-                      <TicketIcon className="w-10 h-10 absolute -right-3 -bottom-3 text-white/5 rotate-12" />
                    </div>
                    <div className="p-5 bg-soft-gray/60 backdrop-blur-sm rounded-3xl border border-border-gray/50 text-center shadow-lg relative overflow-hidden group">
                       <p className="text-[11px] font-medium uppercase opacity-20 mb-2 tracking-widest font-light">Выигрыш</p>
                       <p className="text-[24px] font-black text-gold leading-none">{convert(profile.totalWon)} {CURRENCIES[currency].symbol}</p>
-                      <TrophyIcon className="w-10 h-10 absolute -right-3 -bottom-3 text-gold/5 rotate-12" />
                    </div>
                 </div>
               </div>
@@ -605,10 +704,9 @@ const App: React.FC = () => {
         </button>
       </nav>
 
-      {/* Step Modals - Independent, Full-Screen Menu */}
+      {/* Step Modals */}
       {step !== ContestStep.LIST && (
         <div className="fixed inset-0 z-[100] bg-matte-black flex flex-col p-6 animate-slide-up no-scrollbar overflow-y-auto">
-           {/* Modal-specific backgrounds to ensure total isolation */}
            <div className="absolute inset-0 bg-matte-black z-0"></div>
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gold/[0.04] blur-[150px] rounded-full pointer-events-none z-1"></div>
 
@@ -629,8 +727,8 @@ const App: React.FC = () => {
                   </div>
                   
                   {refError && (
-                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
-                      <p className="text-[12px] font-black text-red-500 uppercase">{refError}</p>
+                    <div className="p-5 bg-red-500/10 border border-red-500/30 rounded-3xl">
+                      <p className="text-[13px] font-black text-red-500 uppercase leading-relaxed">{refError}</p>
                     </div>
                   )}
 
@@ -696,7 +794,7 @@ const App: React.FC = () => {
                             </div>
                           </div>
                           <div className="text-right relative z-10">
-                             <p className="text-[18px] font-black text-green-500 tracking-tighter shadow-green-500/20">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p>
+                             <p className="text-[18px] font-black text-green-500 tracking-tighter">{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p>
                           </div>
                         </div>
                       ))}
@@ -748,46 +846,43 @@ const App: React.FC = () => {
 
               {step === ContestStep.TICKET_SHOW && (
                 <div className="w-full max-w-[340px] space-y-12 animate-pop relative py-10">
-                   <div className="bg-white text-matte-black rounded-3xl shadow-2xl overflow-hidden flex flex-col relative z-20">
-                      <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 w-8 h-5 bg-matte-black rounded-full z-10"></div>
+                   {/* Integrated Ticket - Dark Palette Adaptation */}
+                   <div className="bg-deep-gray text-white rounded-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col relative border border-gold/30">
+                      <div className="absolute top-[-15px] left-1/2 -translate-x-1/2 w-10 h-8 bg-matte-black rounded-full z-10 border border-gold/20"></div>
                       
-                      <div className="p-8 pb-4 border-b-2 border-dashed border-gray-300 relative">
+                      <div className="p-8 pb-4 border-b-2 border-dashed border-gold/20 relative bg-soft-gray/30">
                         <div className="flex justify-between items-center mb-6">
                           <div className="flex items-center gap-2">
-                            <QrCodeIcon className="w-5 h-5 text-gold" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">LOTTERY TICKET</span>
+                            <QrCodeIcon className="w-6 h-6 text-gold" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold/60">BEEF • TICKET</span>
                           </div>
-                          <span className="text-[10px] font-black text-gold">#{selectedContest?.id.slice(-6)}</span>
+                          <span className="text-[10px] font-black text-gold/40">#{selectedContest?.id.slice(-6)}</span>
                         </div>
-                        <h3 className="text-[16px] font-black uppercase mb-1">{selectedContest?.title}</h3>
-                        <p className="text-[11px] text-gray-400 font-medium">Ваше участие подтверждено</p>
+                        <h3 className="text-[20px] font-black uppercase mb-1 text-white tracking-tight">{selectedContest?.title}</h3>
+                        <p className="text-[11px] text-white/30 font-bold uppercase tracking-widest">Участие подтверждено</p>
                       </div>
 
-                      <div className="p-10 flex flex-col items-center justify-center relative bg-gray-50/50">
-                        <div className="absolute top-1/2 -left-3 -translate-y-1/2 w-6 h-6 bg-matte-black rounded-full"></div>
-                        <div className="absolute top-1/2 -right-3 -translate-y-1/2 w-6 h-6 bg-matte-black rounded-full"></div>
+                      <div className="p-10 flex flex-col items-center justify-center relative bg-matte-black/40">
+                        <div className="absolute top-1/2 -left-4 -translate-y-1/2 w-8 h-8 bg-matte-black rounded-full border-r border-gold/20"></div>
+                        <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-8 h-8 bg-matte-black rounded-full border-l border-gold/20"></div>
 
-                        <span className="text-[12px] font-bold text-gray-300 uppercase tracking-[0.5em] mb-4">ВАШ НОМЕР</span>
-                        <h1 className="text-[80px] font-black italic text-matte-black tracking-tighter leading-none select-none drop-shadow-sm">#{userTicket}</h1>
+                        <span className="text-[12px] font-black text-gold/40 uppercase tracking-[0.6em] mb-6">ВАШ НОМЕР</span>
+                        <h1 className="text-[90px] font-black italic text-white tracking-tighter leading-none select-none drop-shadow-[0_4px_12px_rgba(197,160,89,0.4)]">#{userTicket}</h1>
                         
-                        <div className="mt-8 flex items-center gap-2 px-4 py-2 bg-green-500/10 rounded-full border border-green-500/20">
-                          <CheckBadgeIcon className="w-4 h-4 text-green-600" />
-                          <span className="text-[10px] font-black text-green-600 uppercase">АКТИВЕН</span>
+                        <div className="mt-10 flex items-center gap-3 px-6 py-2.5 bg-gold/5 rounded-full border border-gold/30">
+                          <CheckBadgeIcon className="w-5 h-5 text-gold-light" />
+                          <span className="text-[12px] font-black text-gold-light uppercase tracking-widest">АКТИВЕН</span>
                         </div>
                       </div>
 
-                      <div className="h-6 bg-matte-black flex items-center justify-center gap-0.5 px-6">
-                         {[...Array(20)].map((_, i) => (
-                           <div key={i} className="bg-white/20 h-full" style={{ width: Math.random() * 4 + 1 + 'px' }}></div>
+                      <div className="h-8 bg-matte-black/80 flex items-center justify-center gap-1 px-8">
+                         {[...Array(30)].map((_, i) => (
+                           <div key={i} className="bg-gold/10 h-full" style={{ width: Math.random() * 3 + 1 + 'px' }}></div>
                          ))}
                       </div>
                    </div>
 
-                   <div className="space-y-6 relative z-20">
-                     <p className="text-[13px] font-black text-gold uppercase tracking-[0.2em] animate-pulse">В случае выигрыша вам придёт уведомление. Удачи!</p>
-                   </div>
-                   
-                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-5 border-2 border-gold/30 rounded-3xl text-[14px] font-black uppercase text-gold active:bg-gold/10 transition-all shadow-lg backdrop-blur-sm relative z-20">На главную</button>
+                   <button onClick={() => setStep(ContestStep.LIST)} className="w-full py-6 bg-matte-black/60 border-2 border-gold/30 rounded-3xl text-[14px] font-black uppercase text-gold active:bg-gold/20 transition-all shadow-2xl backdrop-blur-md relative z-20">На главную</button>
                 </div>
               )}
            </div>
@@ -803,13 +898,13 @@ const App: React.FC = () => {
           0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
           50% { transform: translate(-4%, -6%) scale(1.05); opacity: 0.5; }
         }
-        @keyframes glow-pulse {
-          0%, 100% { opacity: 0.2; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(1.2); }
-        }
+        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pulse-subtle { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        
         .animate-glow-slow { animation: glow-slow 18s ease-in-out infinite; }
         .animate-glow-fast { animation: glow-fast 12s ease-in-out infinite; }
-        .animate-glow-pulse { animation: glow-pulse 8s ease-in-out infinite; }
+        .animate-spin-slow { animation: spin-slow 8s linear infinite; }
+        .animate-pulse-subtle { animation: pulse-subtle 2s ease-in-out infinite; }
         
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-up { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
