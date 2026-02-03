@@ -86,7 +86,7 @@ const MALE_NAMES_EN = [
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
   "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
-  "Борис", "Anatoly", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Ruslan", "Тимур",
+  "Борис", "Anatoly", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Stanislav", "Тимур",
   "Даниил", "Егор", "Никита", "Илья", "Матвей", "Макар", "Лев", "Марк", "Артемий", "Арсений",
   "Ян", "Савелий", "Демид", "Лука", "Тихон", "Ярослав", "Фёдор", "Пётр", "Семён", "Богдан",
   "Григорий", "Захар", "Елисей", "Филипп", "Артур", "Вадим", "Ростислав", "Георгий", "Леон", "Мирон",
@@ -268,6 +268,7 @@ const App: React.FC = () => {
   const [isRefChecking, setIsRefChecking] = useState(false);
   const [refError, setRefError] = useState('');
   const [userTicket, setUserTicket] = useState<number>(0);
+  const [isProjectOpened, setIsProjectOpened] = useState(false);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -475,6 +476,7 @@ const App: React.FC = () => {
     setRefError('');
     setIsRefChecking(false);
     setVerifyStatus('idle');
+    setIsProjectOpened(false);
 
     if (c.isCompleted) {
       setStep(ContestStep.SUCCESS);
@@ -498,7 +500,7 @@ const App: React.FC = () => {
   };
 
   const handleRefCheck = () => {
-    if (isRefChecking) return;
+    if (isRefChecking || !isProjectOpened) return;
     setIsRefChecking(true);
     setRefError('');
     const delay = Math.floor(Math.random() * 2000) + 1000;
@@ -755,8 +757,10 @@ const App: React.FC = () => {
                             </div>
                           )}
 
-                          <div className="mt-6 w-full py-4 bg-gold text-matte-black font-black rounded-2xl text-[13px] uppercase text-center shadow-xl shadow-gold/20 relative z-10 transition-transform active:scale-95">
-                             {isParticipating ? 'ПЕРЕЙТИ В РОЗЫГРЫШ' : 'УЧАСТВОВАТЬ'}
+                          <div className="mt-6 w-full py-4 bg-matte-black/60 border border-gold/40 rounded-2xl text-[13px] uppercase text-center shadow-xl shadow-gold/20 relative z-10 transition-transform active:scale-95 flex items-center justify-center">
+                             <span className="text-gradient-gold font-black">
+                               {isParticipating ? 'ПЕРЕЙТИ В РОЗЫГРЫШ' : 'УЧАСТВОВАТЬ'}
+                             </span>
                           </div>
 
                           {isAdmin && (
@@ -799,9 +803,13 @@ const App: React.FC = () => {
                            <div className="h-[1px] flex-1 mx-3 bg-white/5"></div>
                         </div>
 
-                        <div className="flex justify-between items-end border-t border-border-gray/20 pt-4 relative z-10">
+                        <div className="flex justify-between items-end border-t border-border-gray/20 pt-4 relative z-10 mb-4">
                           <p className="text-[16px] font-black text-gradient-gold opacity-50">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
                           <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{c.participantCount} билетов</p>
+                        </div>
+
+                        <div className="w-full py-3 border border-gold/40 rounded-2xl text-[12px] font-black text-gradient-gold uppercase text-center active:scale-95 transition-transform relative z-10">
+                          Посмотреть итоги
                         </div>
                       </div>
                     );
@@ -875,8 +883,30 @@ const App: React.FC = () => {
                   </div>
                   {refError && <div className="p-5 bg-red-500/10 border border-red-500/30 rounded-3xl animate-shake shadow-lg shadow-red-500/5"><p className="text-[13px] font-black text-red-500 uppercase leading-relaxed">{refError}</p></div>}
                   <div className="space-y-4">
-                    <button onClick={() => window.open(presets.find(p => p.id === selectedContest?.projectId)?.referralLink, '_blank')} className="w-full py-4 bg-soft-gray text-gradient-gold border border-gold/20 font-black uppercase text-[12px] rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-md backdrop-blur-md hover:bg-gold/5 shadow-gold/5"><ArrowTopRightOnSquareIcon className="w-5 h-5"/>Открыть проект</button>
-                    <button onClick={handleRefCheck} disabled={isRefChecking} className="w-full py-5 bg-gold text-matte-black font-black uppercase text-[14px] rounded-3xl shadow-lg active:translate-y-1 transition-all flex items-center justify-center gap-4 disabled:opacity-50 shadow-gold/20">{isRefChecking ? <ArrowPathIcon className="w-6 h-6 animate-spin"/> : "Проверить регистрацию"}</button>
+                    <button 
+                      onClick={() => {
+                        window.open(presets.find(p => p.id === selectedContest?.projectId)?.referralLink, '_blank');
+                        setIsProjectOpened(true);
+                      }} 
+                      className="w-full py-4 bg-soft-gray text-gradient-gold border border-gold/20 font-black uppercase text-[12px] rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-md backdrop-blur-md hover:bg-gold/5 shadow-gold/5"
+                    >
+                      <ArrowTopRightOnSquareIcon className="w-5 h-5"/>Открыть проект
+                    </button>
+                    <button 
+                      onClick={handleRefCheck} 
+                      disabled={isRefChecking || !isProjectOpened} 
+                      className={`w-full py-5 font-black uppercase text-[14px] rounded-3xl shadow-lg active:translate-y-1 transition-all flex items-center justify-center gap-4 disabled:opacity-20 shadow-gold/20 ${!isProjectOpened ? 'bg-soft-gray/50 text-white/20 border border-white/5' : 'bg-gold text-matte-black'}`}
+                    >
+                      {isRefChecking ? (
+                        <span className="flex items-center gap-3">
+                          <ArrowPathIcon className="w-6 h-6 animate-spin"/>
+                          Проверка регистрации на {presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект'}
+                        </span>
+                      ) : "Проверить регистрацию"}
+                    </button>
+                    {!isProjectOpened && (
+                      <p className="text-[10px] font-black uppercase text-gold/40 tracking-widest animate-pulse">Сначала нажмите "Открыть проект"</p>
+                    )}
                   </div>
                 </div>
               )}
