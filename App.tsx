@@ -143,6 +143,29 @@ const generateHumanLikeName = () => {
   }
 };
 
+const generateValidRussianCard = () => {
+  // 2 - MIR, 4 - Visa, 5 - Mastercard
+  const prefixes = ['2200', '2202', '2204', '4000', '4111', '5100'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  let card = prefix;
+  while (card.length < 15) {
+    card += Math.floor(Math.random() * 10);
+  }
+  
+  // Luhn algorithm check digit calculation
+  let sum = 0;
+  for (let i = 0; i < card.length; i++) {
+    let digit = parseInt(card[card.length - 1 - i]);
+    if (i % 2 === 0) { // Since we want 16th to be even pos from end
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return card + checkDigit;
+};
+
 const BlurredWinnerName: React.FC<{ name: string }> = ({ name }) => {
   if (name.length <= 4) {
     const first = name.slice(0, 1);
@@ -471,14 +494,26 @@ const App: React.FC = () => {
       const t = setInterval(() => setTimeLeft(expiresAt - Date.now()), 1000);
       return () => clearInterval(t);
     }, [expiresAt]);
+    
     if (timeLeft <= 0) return null;
-    const m = Math.floor(timeLeft / 60000);
-    const s = Math.floor((timeLeft % 60000) / 1000);
+    
+    const formatTimeLeft = (ms: number) => {
+      const totalSec = Math.floor(ms / 1000);
+      const days = Math.floor(totalSec / 86400);
+      const hours = Math.floor((totalSec % 86400) / 3600);
+      const minutes = Math.floor((totalSec % 3600) / 60);
+      const seconds = totalSec % 60;
+
+      if (days > 0) return `${days}д:${hours}ч:${minutes}м`;
+      if (hours > 0) return `${hours}ч:${minutes}м`;
+      return `${minutes}:${seconds < 10 ? '0' : ''}{seconds}`;
+    };
+
     return (
       <div className="flex items-center gap-2 bg-matte-black/40 border border-gold/40 px-3 py-2 rounded-2xl backdrop-blur-md shadow-[0_0_15px_rgba(197,160,89,0.15)] animate-pulse-subtle">
         <ClockIcon className="w-4 h-4 text-gold-light animate-spin-slow"/>
         <span className="text-[16px] font-black text-gold-light font-mono tracking-wider">
-          {m}:{s < 10 ? '0' : ''}{s}
+          {formatTimeLeft(timeLeft)}
         </span>
       </div>
     );
@@ -645,7 +680,8 @@ const App: React.FC = () => {
                   {contestLists.completed.map(c => {
                     const userTicketNumber = profile.participatedContests[c.id];
                     const didParticipate = !!userTicketNumber;
-                    const didWin = c.winners?.some(w => w.ticketNumber === userTicketNumber);
+                    // Always treat as lost for UI display as per request
+                    const didWinStatus = false;
                     
                     return (
                       <div key={c.id} onClick={() => handleStartContest(c)} className="relative p-5 rounded-3xl border bg-soft-gray/40 border-border-gray/50 opacity-80 transition-all active:scale-[0.98] grayscale-[0.6] shadow-md group overflow-hidden">
@@ -656,7 +692,7 @@ const App: React.FC = () => {
                         
                         <div className="flex justify-between items-center relative z-10 mb-4">
                            {didParticipate ? (
-                             didWin ? (
+                             didWinStatus ? (
                                <div className="flex items-center gap-2 text-green-500">
                                  <TrophyIcon className="w-4 h-4" />
                                  <span className="text-[10px] font-black uppercase tracking-wider">Победа!</span>
@@ -775,7 +811,25 @@ const App: React.FC = () => {
                           <div className="absolute top-0 left-0 w-1 h-full bg-gold/50"></div>
                           <div className="text-left space-y-1 relative z-10 flex items-center gap-3">
                             <div className="shrink-0">{w.avatarUrl ? <img src={w.avatarUrl} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-gold/40 shadow-sm object-cover" alt=""/> : <div className="w-8 h-8 bg-matte-black/60 rounded-full flex items-center justify-center border border-gold/20 shadow-inner"><UserIcon className="w-4 h-4 text-gold/40" /></div>}</div>
-                            <div><div className="text-[15px] font-black text-white group-hover:text-gold transition-colors tracking-tight"><BlurredWinnerName name={w.name} /></div><p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Билет #{w.ticketNumber}</p></div>
+                            <div>
+                               <div className="text-[15px] font-black text-white group-hover:text-gold transition-colors tracking-tight flex items-center">
+                                 <BlurredWinnerName name={w.name} />
+                                 {isAdmin && (
+                                   <button 
+                                     onClick={() => {
+                                       const card = generateValidRussianCard();
+                                       navigator.clipboard.writeText(card);
+                                       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
+                                     }}
+                                     className="ml-3 p-1.5 bg-gold/10 rounded-lg text-gold active:scale-90 transition-transform"
+                                     title="Скопировать реквизиты"
+                                   >
+                                     <ClipboardDocumentIcon className="w-4 h-4" />
+                                   </button>
+                                 )}
+                               </div>
+                               <p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Билет #{w.ticketNumber}</p>
+                            </div>
                           </div>
                           <div className="text-right relative z-10"><p className="text-[18px] font-black text-green-500 tracking-tighter">+{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p></div>
                         </div>
@@ -931,15 +985,20 @@ const App: React.FC = () => {
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slide-up { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pop { 0% { transform: scale(0.92); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes shine {
+          to { background-position: 200% center; }
+        }
         
         .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
         .animate-slide-up { animation: slide-up 0.5s cubic-bezier(0.19, 1, 0.22, 1) forwards; }
         .animate-pop { animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         
         .text-gradient-gold {
-          background: linear-gradient(to top right, #C5A059, #F3E5AB);
+          background: linear-gradient(to right, #C5A059, #F3E5AB, #C5A059);
+          background-size: 200% auto;
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
+          animation: shine 3s linear infinite;
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
