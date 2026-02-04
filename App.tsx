@@ -291,7 +291,14 @@ const App: React.FC = () => {
     }, 5000);
 
     const savedProfile = localStorage.getItem(PROFILE_KEY);
-    if (savedProfile) setProfile(prev => ({ ...prev, ...JSON.parse(savedProfile) }));
+    if (savedProfile) {
+      const parsed = JSON.parse(savedProfile);
+      setProfile(prev => ({ 
+        ...prev, 
+        ...parsed,
+        verifiedProjects: parsed.verifiedProjects || [] 
+      }));
+    }
 
     return () => clearInterval(interval);
   }, []);
@@ -501,9 +508,10 @@ const App: React.FC = () => {
       return;
     }
 
-    // Проверка регистрации по ID проекта
+    // Проверка регистрации ПО ID ПРОЕКТА
+    // Если пользователь уже верифицировал этот конкретный проект, пропускаем проверку
     const isVerifiedForThisProject = profile.verifiedProjects?.includes(c.projectId);
-    if (isVerifiedForThisProject || profile.participationCount > 0) {
+    if (isVerifiedForThisProject) {
       setStep(ContestStep.PAYOUT);
       return;
     }
@@ -524,7 +532,7 @@ const App: React.FC = () => {
         setRefClickCount(prev => prev + 1);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       } else {
-        // Успешная проверка - сохраняем ID проекта в список верифицированных
+        // Успешная проверка - сохраняем ID проекта в список верифицированных ПЕРСОНАЛЬНО
         if (selectedContest) {
             const newVerified = Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]));
             const newProfile = { ...profile, verifiedProjects: newVerified };
@@ -564,7 +572,7 @@ const App: React.FC = () => {
       participationCount: profile.participationCount + 1,
       savedPayouts: newSaved.slice(-5),
       participatedContests: { ...profile.participatedContests, [selectedContest.id]: myTicket },
-      // На всякий случай дублируем здесь добавление проекта в верифицированные
+      // Дублируем добавление проекта в верифицированные для надежности
       verifiedProjects: Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]))
     };
     setProfile(newProfile);
