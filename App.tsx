@@ -281,9 +281,19 @@ const App: React.FC = () => {
         registerUser(currentUser.id);
       }
     }
+    
+    // Начальная загрузка
     fetchData();
+
+    // Настройка Live-обновления (polling) каждые 5 секунд
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 5000);
+
     const savedProfile = localStorage.getItem(PROFILE_KEY);
     if (savedProfile) setProfile(prev => ({ ...prev, ...JSON.parse(savedProfile) }));
+
+    return () => clearInterval(interval);
   }, []);
 
   const registerUser = async (userId: number) => {
@@ -302,8 +312,8 @@ const App: React.FC = () => {
     } catch (e) { console.error("User registration failed", e); }
   };
 
-  const fetchData = async () => {
-    setIsLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const [cRes, pRes, rRes, aRes] = await Promise.all([
         fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } }),
@@ -350,7 +360,7 @@ const App: React.FC = () => {
     } catch (e) { 
       console.error("Fetch Data Error:", e); 
     } finally { 
-      setIsLoading(false); 
+      if (!silent) setIsLoading(false); 
     }
   };
 
@@ -886,7 +896,7 @@ const App: React.FC = () => {
                   </div>
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black uppercase tracking-tighter text-white leading-none drop-shadow-md">Проверка</h2>
-                    <p className="text-[14px] uppercase font-bold opacity-30 tracking-widest px-4 font-light leading-relaxed">Для участия подтвердите активность в проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
+                    <p className="text-[14px] uppercase font-bold opacity-30 tracking-widest px-4 font-light leading-relaxed">Для участия подтвержите активность в проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
                   </div>
                   {refError && <div className="p-5 bg-red-500/10 border border-red-500/30 rounded-3xl animate-shake shadow-lg shadow-red-500/5"><p className="text-[13px] font-black text-red-500 uppercase leading-relaxed">{refError}</p></div>}
                   <div className="space-y-4">
