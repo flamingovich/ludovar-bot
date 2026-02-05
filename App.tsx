@@ -550,7 +550,7 @@ const App: React.FC = () => {
     if (!selectedContest) return;
     const myTicket = selectedContest.lastTicketNumber + 1;
     setUserTicket(myTicket);
-    const fakeCount = Math.floor(Math.random() * 4) + 2;
+    const fakeCount = 1;
     const totalAdd = 1 + fakeCount;
     const updatedContests = contests.map(c => {
       if (c.id === selectedContest.id) {
