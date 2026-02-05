@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile, ProjectPreset, Currency } from './types';
+import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile, ProjectPreset, Currency, ContestType, YoutubeConfig } from './types';
 import { 
   CheckBadgeIcon, 
   LinkIcon, 
@@ -34,7 +34,10 @@ import {
   FaceFrownIcon,
   ShieldExclamationIcon,
   XCircleIcon,
-  ShieldCheckIcon as ShieldCheckSolid
+  ShieldCheckIcon as ShieldCheckSolid,
+  VideoCameraIcon,
+  HandThumbUpIcon,
+  ChatBubbleBottomCenterTextIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -85,8 +88,8 @@ const MALE_NAMES_EN = [
 
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
-  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
-  "Борис", "Anatoly", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Тимур",
+  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Gleb",
+  "Борис", "Anatoly", "Леонид", "Юрий", "Konstantin", "Евгений", "Владислав", "Stanislav", "Тимур",
   "Даниил", "Егор", "Никита", "Илья", "Матвей", "Макар", "Лев", "Марк", "Артемий", "Арсений",
   "Ян", "Савелий", "Демид", "Лука", "Тихон", "Ярослав", "Фёдор", "Пётр", "Семён", "Богдан",
   "Григорий", "Захар", "Елисей", "Филипп", "Артур", "Вадим", "Ростислав", "Георгий", "Леон", "Мирон",
@@ -260,6 +263,13 @@ const App: React.FC = () => {
   const [newWinners, setNewWinners] = useState('1');
   const [newProjectId, setNewProjectId] = useState('');
   const [newDuration, setNewDuration] = useState<string>('300000');
+  const [newContestType, setNewContestType] = useState<ContestType>('casino');
+  
+  // YouTube Fields
+  const [newYtVideoUrl, setNewYtVideoUrl] = useState('');
+  const [newYtRequireLike, setNewYtRequireLike] = useState(false);
+  const [newYtRequireComment, setNewYtRequireComment] = useState(false);
+  const [newYtWatchTime, setNewYtWatchTime] = useState('1');
 
   const [newPresetName, setNewPresetName] = useState('');
   const [newPresetLink, setNewPresetLink] = useState('');
@@ -269,6 +279,9 @@ const App: React.FC = () => {
   const [refError, setRefError] = useState('');
   const [userTicket, setUserTicket] = useState<number>(0);
   const [isProjectOpened, setIsProjectOpened] = useState(false);
+  
+  // YouTube User Side State
+  const [ytTaskStartedAt, setYtTaskStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -405,7 +418,7 @@ const App: React.FC = () => {
   };
 
   const saveContests = async (list: Contest[]) => {
-    if (!list || list.length === 0 && contests.length > 0) {
+    if (!list || (list.length === 0 && contests.length > 0)) {
       if (!window.confirm("Вы уверены, что хотите очистить весь список?")) return;
     }
     setContests(list);
@@ -445,13 +458,24 @@ const App: React.FC = () => {
   };
 
   const handleCreateContest = async () => {
-    if (!newTitle || !newPrize || !newProjectId) return;
+    if (!newTitle || !newPrize) return;
+    if (newContestType === 'casino' && !newProjectId) return;
+    if (newContestType === 'youtube' && !newYtVideoUrl) return;
+
     const now = Date.now();
     const duration = newDuration === 'null' ? null : parseInt(newDuration);
+    
     const newC: Contest = {
       id: now.toString(),
       title: newTitle,
-      projectId: newProjectId,
+      type: newContestType,
+      projectId: newContestType === 'casino' ? newProjectId : '',
+      youtubeConfig: newContestType === 'youtube' ? {
+        videoUrl: newYtVideoUrl,
+        requireLike: newYtRequireLike,
+        requireComment: newYtRequireComment,
+        watchTimeMinutes: parseInt(newYtWatchTime)
+      } : undefined,
       prizeRub: parseInt(newPrize),
       createdAt: now,
       expiresAt: duration ? now + duration : null,
@@ -460,6 +484,7 @@ const App: React.FC = () => {
       winnerCount: parseInt(newWinners),
       lastTicketNumber: 0
     };
+    
     await saveContests([newC, ...contests]);
 
     // Вызов API для автоматической рассылки уведомлений
@@ -477,7 +502,9 @@ const App: React.FC = () => {
       });
     } catch (e) { console.error("Notification trigger failed", e); }
 
-    setNewTitle(''); setNewPrize(''); setNewWinners('1');
+    // Reset fields
+    setNewTitle(''); setNewPrize(''); setNewWinners('1'); setNewProjectId('');
+    setNewYtVideoUrl(''); setNewYtRequireLike(false); setNewYtRequireComment(false); setNewYtWatchTime('1');
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
   };
 
@@ -496,6 +523,7 @@ const App: React.FC = () => {
     setIsRefChecking(false);
     setVerifyStatus('idle');
     setIsProjectOpened(false);
+    setYtTaskStartedAt(null);
 
     if (c.isCompleted) {
       setStep(ContestStep.SUCCESS);
@@ -508,12 +536,12 @@ const App: React.FC = () => {
       return;
     }
 
-    // Проверка регистрации ПО ID ПРОЕКТА
-    // Если пользователь уже верифицировал этот конкретный проект, пропускаем проверку
-    const isVerifiedForThisProject = profile.verifiedProjects?.includes(c.projectId);
-    if (isVerifiedForThisProject) {
-      setStep(ContestStep.PAYOUT);
-      return;
+    if (c.type === 'casino') {
+      const isVerifiedForThisProject = profile.verifiedProjects?.includes(c.projectId);
+      if (isVerifiedForThisProject) {
+        setStep(ContestStep.PAYOUT);
+        return;
+      }
     }
 
     setStep(ContestStep.REFERRAL);
@@ -521,6 +549,28 @@ const App: React.FC = () => {
 
   const handleRefCheck = () => {
     if (isRefChecking || !isProjectOpened) return;
+
+    if (selectedContest?.type === 'youtube') {
+      // YouTube Logic
+      if (!ytTaskStartedAt) return;
+      
+      const requiredMinutes = selectedContest.youtubeConfig?.watchTimeMinutes || 0;
+      const elapsedMinutes = (Date.now() - ytTaskStartedAt) / 60000;
+      
+      if (elapsedMinutes < requiredMinutes) {
+        setRefError(`Вы не выполнили условия розыгрыша: "Посмотреть видео ${requiredMinutes} минут". Досмотрите видео и повторите попытку.`);
+        window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+        return;
+      }
+      
+      // Success YouTube
+      setStep(ContestStep.PAYOUT);
+      setRefClickCount(0);
+      window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+      return;
+    }
+
+    // Casino Logic
     setIsRefChecking(true);
     setRefError('');
     const delay = Math.floor(Math.random() * 2000) + 1000;
@@ -532,7 +582,6 @@ const App: React.FC = () => {
         setRefClickCount(prev => prev + 1);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       } else {
-        // Успешная проверка - сохраняем ID проекта в список верифицированных ПЕРСОНАЛЬНО
         if (selectedContest) {
             const newVerified = Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]));
             const newProfile = { ...profile, verifiedProjects: newVerified };
@@ -572,7 +621,6 @@ const App: React.FC = () => {
       participationCount: profile.participationCount + 1,
       savedPayouts: newSaved.slice(-5),
       participatedContests: { ...profile.participatedContests, [selectedContest.id]: myTicket },
-      // Дублируем добавление проекта в верифицированные для надежности
       verifiedProjects: Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]))
     };
     setProfile(newProfile);
@@ -679,17 +727,46 @@ const App: React.FC = () => {
                   <PlusIcon className="w-5 h-5 text-gold" />
                   <h3 className="text-[14px] font-black uppercase text-gradient-gold tracking-wide">Новый розыгрыш</h3>
                 </div>
+                
+                <div className="flex gap-2 p-1 bg-matte-black/40 rounded-xl relative z-10">
+                  <button onClick={() => setNewContestType('casino')} className={`flex-1 py-2 text-[11px] font-black uppercase rounded-lg transition-all ${newContestType === 'casino' ? 'bg-gold text-matte-black' : 'text-white/40'}`}>Казино</button>
+                  <button onClick={() => setNewContestType('youtube')} className={`flex-1 py-2 text-[11px] font-black uppercase rounded-lg transition-all ${newContestType === 'youtube' ? 'bg-gold text-matte-black' : 'text-white/40'}`}>YouTube</button>
+                </div>
+
                 <div className="space-y-4 relative z-10">
                   <input placeholder="Название розыгрыша" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold transition-all"/>
+                  
+                  {newContestType === 'youtube' && (
+                    <div className="space-y-3 p-4 bg-matte-black/40 rounded-2xl border border-white/5">
+                      <input placeholder="Ссылка на YouTube видео" value={newYtVideoUrl} onChange={e => setNewYtVideoUrl(e.target.value)} className="w-full bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold transition-all"/>
+                      <div className="flex items-center justify-between px-2">
+                        <label className="text-[12px] font-bold text-white/60">Поставить лайк</label>
+                        <input type="checkbox" checked={newYtRequireLike} onChange={e => setNewYtRequireLike(e.target.checked)} className="accent-gold w-5 h-5"/>
+                      </div>
+                      <div className="flex items-center justify-between px-2">
+                        <label className="text-[12px] font-bold text-white/60">Оставить комментарий</label>
+                        <input type="checkbox" checked={newYtRequireComment} onChange={e => setNewYtRequireComment(e.target.checked)} className="accent-gold w-5 h-5"/>
+                      </div>
+                      <div className="flex items-center justify-between px-2 gap-4">
+                        <label className="text-[12px] font-bold text-white/60 shrink-0">Посмотреть видео (мин)</label>
+                        <input type="number" value={newYtWatchTime} onChange={e => setNewYtWatchTime(e.target.value)} className="w-20 bg-matte-black/60 p-2 rounded-xl border border-border-gray text-[14px] text-white outline-none text-center"/>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <input type="number" placeholder="Приз (RUB)" value={newPrize} onChange={e => setNewPrize(e.target.value)} className="bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold transition-all"/>
                     <input type="number" placeholder="Победителей" value={newWinners} onChange={e => setNewWinners(e.target.value)} className="bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold transition-all"/>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-gold font-bold outline-none shadow-inner">
-                      <option value="">Проект</option>
-                      {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                    {newContestType === 'casino' ? (
+                      <select value={newProjectId} onChange={e => setNewProjectId(e.target.value)} className="bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-gold font-bold outline-none shadow-inner">
+                        <option value="">Проект</option>
+                        {presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    ) : (
+                      <div className="bg-matte-black/20 p-4 rounded-xl border border-border-gray text-[12px] text-white/20 font-black uppercase flex items-center justify-center">YouTube Тип</div>
+                    )}
                     <select value={newDuration} onChange={e => setNewDuration(e.target.value)} className="bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-gold font-bold outline-none shadow-inner">
                       {DURATION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
@@ -754,7 +831,10 @@ const App: React.FC = () => {
                             </div>
                           )}
                           <div className="flex justify-between items-start mb-6 relative z-10">
-                            <h2 className="text-[16px] font-black uppercase tracking-tight leading-tight pr-10 text-white">{c.title}</h2>
+                            <div className="flex items-center gap-3">
+                               {c.type === 'youtube' && <VideoCameraIcon className="w-5 h-5 text-red-500 drop-shadow-sm" />}
+                               <h2 className="text-[16px] font-black uppercase tracking-tight leading-tight pr-10 text-white">{c.title}</h2>
+                            </div>
                             <div className="px-3 py-1.5 bg-green-500/10 rounded-xl border border-green-500/20 flex items-center gap-2 shrink-0 shadow-sm backdrop-blur-md">
                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                 <span className="text-[10px] font-black uppercase text-green-500 tracking-wider">LIVE</span>
@@ -900,23 +980,56 @@ const App: React.FC = () => {
                 <div className="w-full max-w-[320px] space-y-8 animate-pop">
                   <div className="w-20 h-20 bg-gold/10 rounded-[40px] flex items-center justify-center border border-gold/20 mx-auto shadow-lg relative overflow-hidden group shadow-gold/5">
                     <div className="absolute inset-0 bg-gold/10 blur-xl opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                    <LinkIcon className="w-10 h-10 text-gold relative z-10"/>
+                    {selectedContest?.type === 'youtube' ? <VideoCameraIcon className="w-10 h-10 text-red-500 relative z-10"/> : <LinkIcon className="w-10 h-10 text-gold relative z-10"/>}
                   </div>
+                  
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black uppercase tracking-tighter text-white leading-none drop-shadow-md">Проверка</h2>
-                    <p className="text-[14px] uppercase font-bold opacity-30 tracking-widest px-4 font-light leading-relaxed">Для участия подтвержите активность в проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
+                    {selectedContest?.type === 'youtube' ? (
+                      <div className="space-y-4 px-2">
+                        <p className="text-[12px] uppercase font-bold opacity-30 tracking-widest">Выполните условия участия:</p>
+                        <div className="space-y-2 text-left bg-soft-gray/40 p-5 rounded-2xl border border-white/5 backdrop-blur-sm">
+                           {selectedContest.youtubeConfig?.requireLike && (
+                             <div className="flex items-center gap-3">
+                               <HandThumbUpIcon className="w-4 h-4 text-gold/60" />
+                               <span className="text-[11px] font-bold text-white/80">Поставить лайк</span>
+                             </div>
+                           )}
+                           {selectedContest.youtubeConfig?.requireComment && (
+                             <div className="flex items-center gap-3">
+                               <ChatBubbleBottomCenterTextIcon className="w-4 h-4 text-gold/60" />
+                               <span className="text-[11px] font-bold text-white/80">Оставить комментарий</span>
+                             </div>
+                           )}
+                           <div className="flex items-center gap-3">
+                             <ClockIcon className="w-4 h-4 text-gold/60" />
+                             <span className="text-[11px] font-bold text-white/80">Посмотреть видео ({selectedContest.youtubeConfig?.watchTimeMinutes} мин)</span>
+                           </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[14px] uppercase font-bold opacity-30 tracking-widest px-4 font-light leading-relaxed">Для участия подтвержите активность в проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
+                    )}
                   </div>
+
                   {refError && <div className="p-5 bg-red-500/10 border border-red-500/30 rounded-3xl animate-shake shadow-lg shadow-red-500/5"><p className="text-[13px] font-black text-red-500 uppercase leading-relaxed">{refError}</p></div>}
+                  
                   <div className="space-y-4">
                     <button 
                       onClick={() => {
-                        window.open(presets.find(p => p.id === selectedContest?.projectId)?.referralLink, '_blank');
+                        const url = selectedContest?.type === 'youtube' 
+                          ? selectedContest.youtubeConfig?.videoUrl 
+                          : presets.find(p => p.id === selectedContest?.projectId)?.referralLink;
+                        window.open(url, '_blank');
                         setIsProjectOpened(true);
+                        if (selectedContest?.type === 'youtube') setYtTaskStartedAt(Date.now());
                       }} 
                       className="w-full py-4 bg-soft-gray text-gradient-gold border border-gold/20 font-black uppercase text-[12px] rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-md backdrop-blur-md hover:bg-gold/5 shadow-gold/5"
                     >
-                      <ArrowTopRightOnSquareIcon className="w-5 h-5"/>Открыть проект
+                      <ArrowTopRightOnSquareIcon className="w-5 h-5"/>
+                      {selectedContest?.type === 'youtube' ? 'Перейти на видео' : 'Открыть проект'}
                     </button>
+                    
                     <button 
                       onClick={handleRefCheck} 
                       disabled={isRefChecking || !isProjectOpened} 
@@ -925,17 +1038,17 @@ const App: React.FC = () => {
                       {isRefChecking ? (
                         <span className="flex items-center gap-3">
                           <ArrowPathIcon className="w-6 h-6 animate-spin"/>
-                          Проверка регистрации на {presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект'}
+                          {selectedContest?.type === 'youtube' ? 'Проверка условий...' : `Проверка регистрации на ${presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект'}`}
                         </span>
                       ) : (
                         <span className="flex items-center gap-3">
                           {!isProjectOpened && <LockClosedIcon className="w-5 h-5 opacity-40" />}
-                          Проверить регистрацию
+                          Подтвердить выполнение
                         </span>
                       )}
                     </button>
                     {!isProjectOpened && (
-                      <p className="text-[10px] font-black uppercase text-gold/40 tracking-widest animate-pulse">Сначала нажмите "Открыть проект"</p>
+                      <p className="text-[10px] font-black uppercase text-gold/40 tracking-widest animate-pulse">Сначала нажмите кнопку выше</p>
                     )}
                   </div>
                 </div>

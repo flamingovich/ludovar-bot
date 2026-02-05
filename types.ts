@@ -31,10 +31,21 @@ export interface ProjectPreset {
   referralLink: string;
 }
 
+export type ContestType = 'casino' | 'youtube';
+
+export interface YoutubeConfig {
+  videoUrl: string;
+  requireLike: boolean;
+  requireComment: boolean;
+  watchTimeMinutes: number;
+}
+
 export interface Contest {
   id: string;
   title: string;
-  projectId: string; // ID пресета проекта
+  type: ContestType;
+  projectId: string; // ID пресета проекта (для casino)
+  youtubeConfig?: YoutubeConfig; // Конфиг для youtube
   prizeRub: number;
   createdAt: number;
   expiresAt?: number | null;
