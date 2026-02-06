@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile, ProjectPreset, Currency, ContestType, YoutubeConfig } from './types';
 import { 
@@ -73,23 +72,20 @@ const DURATION_OPTIONS = [
 ];
 
 const MALE_NAMES_EN = [
-  "Alexey", "Dmitry", "Ivan", "Sergey", "Andrey", "Pavel", "Maxim", "Artem", "Denis", "Vladimir",
-  "Mikhail", "Nikolay", "Aleksandr", "Stepan", "Roman", "Igor", "Oleg", "Victor", "Kirill", "Gleb",
-  "Boris", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur",
   "James", "Robert", "John", "Michael", "David", "William", "Richard", "Joseph", "Thomas", "Charles",
   "Christopher", "Daniel", "Matthew", "Anthony", "Mark", "Donald", "Steven", "Paul", "Andrew", "Joshua",
   "Kenneth", "Kevin", "Brian", "George", "Timothy", "Ronald", "Edward", "Jason", "Jeffrey", "Gary",
   "Ryan", "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank", "Scott", "Justin", "Brandon",
   "Raymond", "Gregory", "Samuel", "Benjamin", "Patrick", "Jack", "Alexander", "Dennis", "Jerry", "Tyler",
   "Aaron", "Adam", "Alan", "Albert", "Austin", "Billy", "Bobby", "Bradley", "Bruce", "Bryan", "Carl",
-  "Christian", "Craig", "Curtis", "Douglas", "Dylan", "Ethan", "Eugene", "Gabriel", "Harold", " Henry",
+  "Christian", "Craig", "Curtis", "Douglas", "Dylan", "Ethan", "Eugene", "Gabriel", "Harold", "Henry",
   "Isaac", "Jeremy", "Jordan", "Keith", "Kyle", "Logan", "Nathan", "Noah", "Oscar", "Philip"
 ];
 
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
-  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Gleb",
-  "Борис", "Anatoly", "Леонид", "Юрий", "Konstantin", "Евгений", "Владислав", "Stanislav", "Тимур",
+  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
+  "Борис", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Тимур",
   "Даниил", "Егор", "Никита", "Илья", "Матвей", "Макар", "Лев", "Марк", "Артемий", "Арсений",
   "Ян", "Савелий", "Демид", "Лука", "Тихон", "Ярослав", "Фёдор", "Пётр", "Семён", "Богдан",
   "Григорий", "Захар", "Елисей", "Филипп", "Артур", "Вадим", "Ростислав", "Георгий", "Леон", "Мирон",
@@ -100,11 +96,9 @@ const MALE_NAMES_RU = [
 ];
 
 const SURNAMES_EN = [
-  "Ivanov", "Petrov", "Smirnov", "Kuznetsov", "Popov", "Vasiliev", "Sokolov", "Mikhailov", "Novikov", "Fedorov",
-  "Morozov", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev",
   "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez",
   "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin",
-  "Lee", "Perez", " Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
+  "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
   "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores",
   "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell", "Mitchell", "Carter", "Roberts",
   "Gomez", "Phillips", "Evans", "Turner", "Diaz", "Parker", "Cruz", "Edwards", "Collins", "Reyes"
@@ -112,9 +106,9 @@ const SURNAMES_EN = [
 
 const SURNAMES_RU = [
   "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Соколов", "Михайлов", "Новиков", "Федоров",
-  "Морозов", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev",
-  "Тихонов", "Белов", "Морозов", "Крылов", "Макаров", "Зайцев", "Соловьев", "Борисов", "Романов", "Воробьев",
-  "Фролов", "Медведев", "Семенов", "Жуков", "Куликов", "Беляев", "Тарасов", "Белоусов", "Орлов", "Киселев",
+  "Морозов", "Волков", "Алексеев", "Лебедев", "Семенов", "Егоров", "Павлов", "Козлов", "Степанов", "Николаев",
+  "Тихонов", "Белов", "Крылов", "Макаров", "Зайцев", "Соловьев", "Борисов", "Романов", "Воробьев",
+  "Фролов", "Медведев", "Жуков", "Куликов", "Беляев", "Тарасов", "Белоусов", "Орлов", "Киселев",
   "Миронов", "Марков", "Никитин", "Соболев", "Королев", "Коновалов", "Федотов", "Щербаков", "Воронин", "Титов",
   "Авдеев", "Агафонов", "Акимов", "Александров", "Алексеев", "Андреев", "Анисимов", "Антонов", "Артемьев",
   "Афанасьев", "Баранов", "Беляков", "Беспалов", "Бирюков", "Блохин", "Бобров", "Богданов", "Бондаренко"
@@ -265,7 +259,6 @@ const App: React.FC = () => {
   const [newDuration, setNewDuration] = useState<string>('300000');
   const [newContestType, setNewContestType] = useState<ContestType>('casino');
   
-  // YouTube Fields
   const [newYtVideoUrl, setNewYtVideoUrl] = useState('');
   const [newYtRequireLike, setNewYtRequireLike] = useState(false);
   const [newYtRequireComment, setNewYtRequireComment] = useState(false);
@@ -280,7 +273,6 @@ const App: React.FC = () => {
   const [userTicket, setUserTicket] = useState<number>(0);
   const [isProjectOpened, setIsProjectOpened] = useState(false);
   
-  // YouTube User Side State
   const [ytTaskStartedAt, setYtTaskStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
@@ -295,10 +287,8 @@ const App: React.FC = () => {
       }
     }
     
-    // Начальная загрузка
     fetchData();
 
-    // Настройка Live-обновления (polling) каждые 5 секунд
     const interval = setInterval(() => {
       fetchData(true);
     }, 5000);
@@ -487,7 +477,6 @@ const App: React.FC = () => {
     
     await saveContests([newC, ...contests]);
 
-    // Вызов API для автоматической рассылки уведомлений
     try {
       const durationLabel = DURATION_OPTIONS.find(opt => opt.value === newDuration)?.label || 'не указано';
       fetch('/api/notify', {
@@ -502,7 +491,6 @@ const App: React.FC = () => {
       });
     } catch (e) { console.error("Notification trigger failed", e); }
 
-    // Reset fields
     setNewTitle(''); setNewPrize(''); setNewWinners('1'); setNewProjectId('');
     setNewYtVideoUrl(''); setNewYtRequireLike(false); setNewYtRequireComment(false); setNewYtWatchTime('1');
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
@@ -551,7 +539,6 @@ const App: React.FC = () => {
     if (isRefChecking || !isProjectOpened) return;
 
     if (selectedContest?.type === 'youtube') {
-      // YouTube Logic
       if (!ytTaskStartedAt) return;
       
       const requiredMinutes = selectedContest.youtubeConfig?.watchTimeMinutes || 0;
@@ -563,21 +550,19 @@ const App: React.FC = () => {
         return;
       }
       
-      // Success YouTube
       setStep(ContestStep.PAYOUT);
       setRefClickCount(0);
       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       return;
     }
 
-    // Casino Logic
     setIsRefChecking(true);
     setRefError('');
     const delay = Math.floor(Math.random() * 2000) + 1000;
     setTimeout(() => {
       setIsRefChecking(false);
       const projectName = presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект';
-      if (refClickCount < 2) {
+      if (refClickCount < 1) {
         setRefError(`Ошибка. Проверьте зарегистрированы ли вы на ${projectName} и попробуйте снова через 5 сек`);
         setRefClickCount(prev => prev + 1);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
@@ -671,7 +656,6 @@ const App: React.FC = () => {
   return (
     <div className="h-screen bg-matte-black text-[#E2E2E6] overflow-hidden flex flex-col font-sans selection:bg-gold/30 relative">
       
-      {/* Glow Gradients */}
       <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[50%] bg-gold/5 blur-[100px] rounded-full animate-glow-slow pointer-events-none z-0"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-gold/3 blur-[80px] rounded-full animate-glow-fast pointer-events-none z-0"></div>
 
@@ -827,7 +811,7 @@ const App: React.FC = () => {
                           {isParticipating && (
                             <div className="mb-3 flex items-center gap-2 text-green-500 relative z-10">
                               <CheckBadgeIcon className="w-5 h-5" />
-                              <span className="text-[12px] font-black uppercase tracking-wider drop-shadow-sm">Вы участвуете. Ваш Билет #{userParticipation}</span>
+                              <span className="text-[12px] font-black uppercase tracking-wider drop-shadow-sm">Вы успешно зарегистрированы в розыгрыше</span>
                             </div>
                           )}
                           <div className="flex justify-between items-start mb-6 relative z-10">
@@ -850,7 +834,7 @@ const App: React.FC = () => {
                               <p className="text-[14px] font-black text-white">{c.winnerCount}</p>
                             </div>
                             <div className="space-y-1 text-right">
-                              <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest text-white">Билетов</p>
+                              <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest text-white">Участников</p>
                               <p className="text-[14px] font-black text-white">{c.participantCount}</p>
                             </div>
                           </div>
@@ -910,7 +894,7 @@ const App: React.FC = () => {
 
                         <div className="flex justify-between items-end border-t border-border-gray/20 pt-4 relative z-10 mb-4">
                           <p className="text-[16px] font-black text-gradient-gold opacity-50">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
-                          <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{c.participantCount} билетов</p>
+                          <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{c.participantCount} участников</p>
                         </div>
 
                         <div className="w-full py-3 border border-gold/40 rounded-2xl text-[12px] font-black text-gradient-gold uppercase text-center active:scale-95 transition-transform relative z-10">
@@ -1008,7 +992,7 @@ const App: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-[14px] uppercase font-bold opacity-30 tracking-widest px-4 font-light leading-relaxed">Для участия подтвержите активность в проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
+                      <p className="text-[14px] uppercase font-bold opacity-30 tracking-widest px-4 font-light leading-relaxed">Для участия подтвердите активность в проекте {presets.find(p => p.id === selectedContest?.projectId)?.name}</p>
                     )}
                   </div>
 
@@ -1020,7 +1004,7 @@ const App: React.FC = () => {
                         const url = selectedContest?.type === 'youtube' 
                           ? selectedContest.youtubeConfig?.videoUrl 
                           : presets.find(p => p.id === selectedContest?.projectId)?.referralLink;
-                        window.open(url, '_blank');
+                        if (url) window.open(url, '_blank');
                         setIsProjectOpened(true);
                         if (selectedContest?.type === 'youtube') setYtTaskStartedAt(Date.now());
                       }} 
@@ -1038,7 +1022,7 @@ const App: React.FC = () => {
                       {isRefChecking ? (
                         <span className="flex items-center gap-3">
                           <ArrowPathIcon className="w-6 h-6 animate-spin"/>
-                          {selectedContest?.type === 'youtube' ? 'Проверка условий...' : `Проверка регистрации на ${presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект'}`}
+                          {selectedContest?.type === 'youtube' ? 'Проверка...' : `Проверка на ${presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект'}`}
                         </span>
                       ) : (
                         <span className="flex items-center gap-3">
@@ -1047,9 +1031,6 @@ const App: React.FC = () => {
                         </span>
                       )}
                     </button>
-                    {!isProjectOpened && (
-                      <p className="text-[10px] font-black uppercase text-gold/40 tracking-widest animate-pulse">Сначала нажмите кнопку выше</p>
-                    )}
                   </div>
                 </div>
               )}
@@ -1060,13 +1041,13 @@ const App: React.FC = () => {
                      <div className="absolute inset-0 bg-gold/20 blur-lg animate-pulse opacity-50"></div>
                      <TrophyIcon className="w-8 h-8 text-gold relative z-10" />
                    </div>
-                   <div className="space-y-2">
+                   <div className="space-y-2 text-center">
                      <h2 className="text-[28px] font-black text-white tracking-tighter leading-none uppercase drop-shadow-md">Итоги розыгрыша</h2>
                      <p className="text-[13px] font-black text-gradient-gold uppercase tracking-widest">{selectedContest.title}</p>
                    </div>
                    <div className="w-full space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar px-2">
                       {selectedContest.winners?.map((w, i) => (
-                        <div key={i} className="p-4 bg-soft-gray/50 backdrop-blur-md border border-border-gray/50 rounded-[28px] flex justify-between items-center animate-slide-up group shadow-lg relative overflow-hidden shadow-black/20" style={{animationDelay: `${i * 0.1}s`}}>
+                        <div key={i} className="p-4 bg-soft-gray/50 backdrop-blur-md border border-border-gray/50 rounded-[28px] flex justify-between items-center group shadow-lg relative overflow-hidden shadow-black/20">
                           <div className="absolute top-0 left-0 w-1 h-full bg-gold/50"></div>
                           <div className="text-left space-y-1 relative z-10 flex items-center gap-3">
                             <div className="shrink-0">{w.avatarUrl ? <img src={w.avatarUrl} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-gold/40 shadow-sm object-cover" alt=""/> : <div className="w-8 h-8 bg-matte-black/60 rounded-full flex items-center justify-center border border-gold/20 shadow-inner"><UserIcon className="w-4 h-4 text-gold/40" /></div>}</div>
@@ -1081,37 +1062,17 @@ const App: React.FC = () => {
                                        window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
                                      }}
                                      className="ml-3 p-1.5 bg-gold/10 rounded-lg text-gold active:scale-90 transition-transform"
-                                     title="Скопировать реквизиты"
                                    >
                                      <ClipboardDocumentIcon className="w-4 h-4" />
                                    </button>
                                  )}
                                </div>
-                               <p className="text-[10px] font-bold uppercase tracking-widest opacity-30">Билет #{w.ticketNumber}</p>
                             </div>
                           </div>
                           <div className="text-right relative z-10"><p className="text-[18px] font-black text-green-500 tracking-tighter">+{convert(w.prizeWon)} {CURRENCIES[currency].symbol}</p></div>
                         </div>
                       ))}
                    </div>
-                   
-                   {/* Provably Fair Section */}
-                   <div className="w-full max-w-[340px] p-5 bg-matte-black/60 rounded-[32px] border border-gold/20 backdrop-blur-xl space-y-3 relative overflow-hidden group shadow-xl">
-                      <div className="absolute top-[-20%] right-[-20%] w-20 h-20 bg-gold/5 blur-3xl"></div>
-                      <div className="flex items-center gap-2 text-gold/60 border-b border-gold/10 pb-3">
-                        <ShieldCheckSolid className="w-4 h-4" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Provably Fair Verification</span>
-                      </div>
-                      <div className="space-y-1.5 text-left">
-                        <p className="text-[9px] font-black uppercase text-white/20 tracking-widest">Seed</p>
-                        <div className="p-3 bg-white/[0.03] rounded-xl border border-white/5 relative group/seed cursor-pointer active:scale-[0.98] transition-transform" onClick={() => { if(selectedContest.seed) { navigator.clipboard.writeText(selectedContest.seed); window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light'); }}}>
-                          <p className="text-[8px] font-mono text-white/40 break-all leading-tight pr-6">{selectedContest.seed || 'pending_generation_...'}</p>
-                          <ClipboardDocumentIcon className="w-3 h-3 text-white/10 absolute right-3 top-1/2 -translate-y-1/2 group-hover/seed:text-gold transition-colors" />
-                        </div>
-                        <p className="text-[8px] text-white/10 font-bold leading-relaxed mt-2 uppercase">Результаты были выбраны с использованием криптографического сида. Это гарантирует отсутствие вмешательства в выбор победителей.</p>
-                      </div>
-                   </div>
-
                    <button onClick={() => { setStep(ContestStep.LIST); setVerifyStatus('idle'); }} className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl text-[15px] shadow-xl active:translate-y-1 transition-all uppercase tracking-widest shadow-gold/20">Назад</button>
                 </div>
               )}
@@ -1136,8 +1097,6 @@ const App: React.FC = () => {
                   
                   {profile.payoutType === 'card' ? (
                     <div className="relative w-full aspect-[1.6/1] bg-gradient-to-br from-[#1c1c1e] to-[#0d0d0d] rounded-[32px] border border-gold/40 p-8 text-left shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden group shadow-gold/5">
-                      <div className="absolute top-[-20%] right-[-10%] w-40 h-40 bg-gold/5 blur-[60px] rounded-full group-hover:bg-gold/10 transition-all"></div>
-                      
                       <div className="flex justify-between items-start mb-10">
                         <div className="w-14 h-11 bg-gradient-to-tr from-gold/40 to-gold/20 rounded-lg border border-gold/30 shadow-inner flex items-center justify-center">
                           <div className="w-10 h-7 bg-matte-black/40 rounded border border-gold/10"></div>
@@ -1149,15 +1108,12 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       
-                      <div className="relative group/input mt-2">
-                         <div className="absolute inset-0 bg-white/5 rounded-2xl blur-sm opacity-0 group-focus-within/input:opacity-100 transition-all"></div>
-                         <input 
-                          placeholder="0000 0000 0000 0000" 
-                          value={profile.payoutValue} 
-                          onChange={e => setProfile({...profile, payoutValue: formatCard(e.target.value)})}
-                          className="relative w-full bg-white/5 hover:bg-white/10 focus:bg-white/[0.08] px-4 py-4 rounded-2xl border border-white/5 focus:border-gold/40 transition-all font-mono text-[18px] text-white font-black tracking-wider outline-none placeholder:text-white/10 shadow-inner"
-                        />
-                      </div>
+                      <input 
+                        placeholder="0000 0000 0000 0000" 
+                        value={profile.payoutValue} 
+                        onChange={e => setProfile({...profile, payoutValue: formatCard(e.target.value)})}
+                        className="relative w-full bg-white/5 hover:bg-white/10 px-4 py-4 rounded-2xl border border-white/5 focus:border-gold/40 transition-all font-mono text-[18px] text-white font-black tracking-wider outline-none placeholder:text-white/10"
+                      />
 
                       <div className="mt-8 flex justify-between items-end opacity-30">
                          <div className="space-y-1">
@@ -1171,14 +1127,12 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="w-full space-y-4">
-                      <input 
-                        placeholder="Адрес кошелька TRC-20" 
-                        value={profile.payoutValue} 
-                        onChange={e => setProfile({...profile, payoutValue: e.target.value})}
-                        className="w-full bg-soft-gray p-6 rounded-3xl border border-border-gray text-gradient-gold font-mono text-[14px] text-center outline-none shadow-inner backdrop-blur-md focus:border-gold transition-all" 
-                      />
-                    </div>
+                    <input 
+                      placeholder="Адрес кошелька TRC-20" 
+                      value={profile.payoutValue} 
+                      onChange={e => setProfile({...profile, payoutValue: e.target.value})}
+                      className="w-full bg-soft-gray p-6 rounded-3xl border border-border-gray text-gradient-gold font-mono text-[14px] text-center outline-none shadow-inner" 
+                    />
                   )}
 
                   <button 
@@ -1188,47 +1142,31 @@ const App: React.FC = () => {
                   >
                     Занять место
                   </button>
-                  {profile.payoutType === 'card' && profile.payoutValue.replace(/\s/g, '').length >= 13 && !isValidLuhn(profile.payoutValue) && (
-                    <p className="text-red-500 text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-1 animate-pulse"><ShieldExclamationIcon className="w-4 h-4"/> Проверьте корректность номера карты</p>
-                  )}
                 </div>
               )}
 
               {step === ContestStep.TICKET_SHOW && (
                 <div className="w-full max-w-[340px] space-y-12 animate-pop relative py-10">
                    <div className="bg-deep-gray text-white rounded-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col relative border border-gold/30 shadow-gold/5">
-                      <div className="absolute top-[-15px] left-1/2 -translate-x-1/2 w-10 h-8 bg-matte-black rounded-full z-10 border border-gold/20 shadow-lg"></div>
-                      
                       <div className="p-8 pb-4 border-b-2 border-dashed border-gold/20 relative bg-soft-gray/30">
-                        <div className="absolute inset-0 bg-gold/[0.03] blur-2xl pointer-events-none"></div>
                         <div className="flex justify-between items-center mb-6 relative z-10">
                           <div className="flex items-center gap-2">
                             <QrCodeIcon className="w-6 h-6 text-gold drop-shadow-sm" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold/60">BEEF • TICKET</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gold/60">BEEF • LUDOVAR</span>
                           </div>
-                          <span className="text-[10px] font-black text-gold/40">#{selectedContest?.id.slice(-6)}</span>
                         </div>
                         <h3 className="text-[20px] font-black uppercase mb-1 text-white tracking-tight relative z-10 drop-shadow-md">{selectedContest?.title}</h3>
                         <p className="text-[11px] text-white/30 font-bold uppercase tracking-widest relative z-10">Участие подтверждено</p>
                       </div>
 
                       <div className="p-10 flex flex-col items-center justify-center relative bg-matte-black/40 shadow-inner">
-                        <div className="absolute top-1/2 -left-4 -translate-y-1/2 w-8 h-8 bg-matte-black rounded-full border-r border-gold/20 shadow-inner"></div>
-                        <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-8 h-8 bg-matte-black rounded-full border-l border-gold/20 shadow-inner"></div>
-
-                        <span className="text-[12px] font-black text-gold/40 uppercase tracking-[0.6em] mb-6 drop-shadow-sm">ВАШ НОМЕР</span>
-                        <h1 className="text-[90px] font-black italic text-white tracking-tighter leading-none select-none drop-shadow-[0_4px_12px_rgba(197,160,89,0.4)]">#{userTicket}</h1>
+                        <span className="text-[12px] font-black text-gold/40 uppercase tracking-[0.6em] mb-6 drop-shadow-sm">СТАТУС УЧАСТИЯ</span>
+                        <h1 className="text-[40px] font-black italic text-white tracking-tighter leading-none select-none drop-shadow-md uppercase">ПОДТВЕРЖДЕНО</h1>
                         
                         <div className="mt-10 flex items-center gap-3 px-6 py-2.5 bg-gold/5 rounded-full border border-gold/30 backdrop-blur-md shadow-lg shadow-gold/5">
                           <CheckBadgeIcon className="w-5 h-5 text-gold-light" />
                           <span className="text-[12px] font-black text-gold-light uppercase tracking-widest">АКТИВЕН</span>
                         </div>
-                      </div>
-
-                      <div className="h-8 bg-matte-black/80 flex items-center justify-center gap-1 px-8 opacity-40">
-                         {[...Array(30)].map((_, i) => (
-                           <div key={i} className="bg-gold/10 h-full" style={{ width: Math.random() * 3 + 1 + 'px' }}></div>
-                         ))}
                       </div>
                    </div>
 
