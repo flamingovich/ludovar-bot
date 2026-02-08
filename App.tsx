@@ -58,6 +58,20 @@ const CURRENCIES: Record<Currency, { symbol: string; label: string; rateMult?: n
   BYN: { symbol: 'Br', label: 'BYN' }
 };
 
+const AVATAR_COLORS = [
+  'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 
+  'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
+  'bg-orange-500', 'bg-cyan-500'
+];
+
+const getFallbackColor = (name: string) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
+
 const DURATION_OPTIONS = [
   { label: '5 мин', value: '300000' },
   { label: '10 мин', value: '600000' },
@@ -72,6 +86,9 @@ const DURATION_OPTIONS = [
 ];
 
 const MALE_NAMES_EN = [
+  "Alexey", "Dmitry", "Ivan", "Sergey", "Andrey", "Pavel", "Maxim", "Artem", "Denis", "Vladimir",
+  "Mikhail", "Nikolay", "Aleksandr", "Stepan", "Roman", "Igor", "Oleg", "Victor", "Kirill", "Gleb",
+  "Boris", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur",
   "James", "Robert", "John", "Michael", "David", "William", "Richard", "Joseph", "Thomas", "Charles",
   "Christopher", "Daniel", "Matthew", "Anthony", "Mark", "Donald", "Steven", "Paul", "Andrew", "Joshua",
   "Kenneth", "Kevin", "Brian", "George", "Timothy", "Ronald", "Edward", "Jason", "Jeffrey", "Gary",
@@ -84,8 +101,8 @@ const MALE_NAMES_EN = [
 
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
-  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
-  "Борис", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Тимур",
+  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Gleb",
+  "Борис", "Anatoly", "Леонид", "Юрий", "Konstantin", "Евгений", "Владислав", "Stanislav", "Тимур",
   "Даниил", "Егор", "Никита", "Илья", "Матвей", "Макар", "Лев", "Марк", "Артемий", "Арсений",
   "Ян", "Савелий", "Демид", "Лука", "Тихон", "Ярослав", "Фёдор", "Пётр", "Семён", "Богдан",
   "Григорий", "Захар", "Елисей", "Филипп", "Артур", "Вадим", "Ростислав", "Георгий", "Леон", "Мирон",
@@ -96,6 +113,8 @@ const MALE_NAMES_RU = [
 ];
 
 const SURNAMES_EN = [
+  "Ivanov", "Petrov", "Smirnov", "Kuznetsov", "Popov", "Vasiliev", "Sokolov", "Mikhailov", "Novikov", "Fedorov",
+  "Morozov", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev",
   "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez",
   "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin",
   "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
@@ -106,9 +125,9 @@ const SURNAMES_EN = [
 
 const SURNAMES_RU = [
   "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Соколов", "Михайлов", "Новиков", "Федоров",
-  "Морозов", "Волков", "Алексеев", "Лебедев", "Семенов", "Егоров", "Павлов", "Козлов", "Степанов", "Николаев",
-  "Тихонов", "Белов", "Крылов", "Макаров", "Зайцев", "Соловьев", "Борисов", "Романов", "Воробьев",
-  "Фролов", "Медведев", "Жуков", "Куликов", "Беляев", "Тарасов", "Белоусов", "Орлов", "Киселев",
+  "Морозов", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev",
+  "Тихонов", "Белов", "Морозов", "Крылов", "Макаров", "Зайцев", "Соловьев", "Борисов", "Романов", "Воробьев",
+  "Фролов", "Медведев", "Семенов", "Жуков", "Куликов", "Беляев", "Тарасов", "Белоусов", "Орлов", "Киселев",
   "Миронов", "Марков", "Никитин", "Соболев", "Королев", "Коновалов", "Федотов", "Щербаков", "Воронин", "Титов",
   "Авдеев", "Агафонов", "Акимов", "Александров", "Алексеев", "Андреев", "Анисимов", "Антонов", "Артемьев",
   "Афанасьев", "Баранов", "Беляков", "Беспалов", "Бирюков", "Блохин", "Бобров", "Богданов", "Бондаренко"
@@ -259,6 +278,7 @@ const App: React.FC = () => {
   const [newDuration, setNewDuration] = useState<string>('300000');
   const [newContestType, setNewContestType] = useState<ContestType>('casino');
   
+  // YouTube Fields
   const [newYtVideoUrl, setNewYtVideoUrl] = useState('');
   const [newYtRequireLike, setNewYtRequireLike] = useState(false);
   const [newYtRequireComment, setNewYtRequireComment] = useState(false);
@@ -273,6 +293,7 @@ const App: React.FC = () => {
   const [userTicket, setUserTicket] = useState<number>(0);
   const [isProjectOpened, setIsProjectOpened] = useState(false);
   
+  // YouTube User Side State
   const [ytTaskStartedAt, setYtTaskStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
@@ -287,8 +308,10 @@ const App: React.FC = () => {
       }
     }
     
+    // Начальная загрузка
     fetchData();
 
+    // Настройка Live-обновления (polling) каждые 5 секунд
     const interval = setInterval(() => {
       fetchData(true);
     }, 5000);
@@ -393,7 +416,11 @@ const App: React.FC = () => {
       const lucky = Math.floor(Math.random() * (contest.lastTicketNumber)) + 1;
       if (!usedTickets.has(lucky)) {
         usedTickets.add(lucky);
-        const avatarUrl = avatarPool.length > 0 ? avatarPool[Math.floor(Math.random() * avatarPool.length)] : undefined;
+        
+        // 30% шанса на отсутствие аватарки
+        const hasAvatar = Math.random() > 0.3;
+        const avatarUrl = (hasAvatar && avatarPool.length > 0) ? avatarPool[Math.floor(Math.random() * avatarPool.length)] : undefined;
+        
         winners.push({ 
           name: generateHumanLikeName(), 
           ticketNumber: lucky, 
@@ -477,6 +504,7 @@ const App: React.FC = () => {
     
     await saveContests([newC, ...contests]);
 
+    // Вызов API для автоматической рассылки уведомлений
     try {
       const durationLabel = DURATION_OPTIONS.find(opt => opt.value === newDuration)?.label || 'не указано';
       fetch('/api/notify', {
@@ -491,6 +519,7 @@ const App: React.FC = () => {
       });
     } catch (e) { console.error("Notification trigger failed", e); }
 
+    // Reset fields
     setNewTitle(''); setNewPrize(''); setNewWinners('1'); setNewProjectId('');
     setNewYtVideoUrl(''); setNewYtRequireLike(false); setNewYtRequireComment(false); setNewYtWatchTime('1');
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
@@ -539,6 +568,7 @@ const App: React.FC = () => {
     if (isRefChecking || !isProjectOpened) return;
 
     if (selectedContest?.type === 'youtube') {
+      // YouTube Logic
       if (!ytTaskStartedAt) return;
       
       const requiredMinutes = selectedContest.youtubeConfig?.watchTimeMinutes || 0;
@@ -550,19 +580,21 @@ const App: React.FC = () => {
         return;
       }
       
+      // Success YouTube
       setStep(ContestStep.PAYOUT);
       setRefClickCount(0);
       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       return;
     }
 
+    // Casino Logic
     setIsRefChecking(true);
     setRefError('');
     const delay = Math.floor(Math.random() * 2000) + 1000;
     setTimeout(() => {
       setIsRefChecking(false);
       const projectName = presets.find(p => p.id === selectedContest?.projectId)?.name || 'проект';
-      if (refClickCount < 1) {
+      if (refClickCount < 2) {
         setRefError(`Ошибка. Проверьте зарегистрированы ли вы на ${projectName} и попробуйте снова через 5 сек`);
         setRefClickCount(prev => prev + 1);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
@@ -584,8 +616,11 @@ const App: React.FC = () => {
     if (!selectedContest) return;
     const myTicket = selectedContest.lastTicketNumber + 1;
     setUserTicket(myTicket);
-    const fakeCount = 1;
-    const totalAdd = 1 + fakeCount;
+    
+    // Рандомно добавляем 1 или 2 бота
+    const botsToAdd = Math.floor(Math.random() * 2) + 1;
+    const totalAdd = 1 + botsToAdd;
+    
     const updatedContests = contests.map(c => {
       if (c.id === selectedContest.id) {
         return {
@@ -656,6 +691,7 @@ const App: React.FC = () => {
   return (
     <div className="h-screen bg-matte-black text-[#E2E2E6] overflow-hidden flex flex-col font-sans selection:bg-gold/30 relative">
       
+      {/* Glow Gradients */}
       <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[50%] bg-gold/5 blur-[100px] rounded-full animate-glow-slow pointer-events-none z-0"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-gold/3 blur-[80px] rounded-full animate-glow-fast pointer-events-none z-0"></div>
 
@@ -811,7 +847,7 @@ const App: React.FC = () => {
                           {isParticipating && (
                             <div className="mb-3 flex items-center gap-2 text-green-500 relative z-10">
                               <CheckBadgeIcon className="w-5 h-5" />
-                              <span className="text-[12px] font-black uppercase tracking-wider drop-shadow-sm">Вы успешно зарегистрированы в розыгрыше</span>
+                              <span className="text-[12px] font-black uppercase tracking-wider drop-shadow-sm">Вы участвуете в розыгрыше</span>
                             </div>
                           )}
                           <div className="flex justify-between items-start mb-6 relative z-10">
@@ -1004,7 +1040,7 @@ const App: React.FC = () => {
                         const url = selectedContest?.type === 'youtube' 
                           ? selectedContest.youtubeConfig?.videoUrl 
                           : presets.find(p => p.id === selectedContest?.projectId)?.referralLink;
-                        if (url) window.open(url, '_blank');
+                        window.open(url, '_blank');
                         setIsProjectOpened(true);
                         if (selectedContest?.type === 'youtube') setYtTaskStartedAt(Date.now());
                       }} 
@@ -1050,7 +1086,15 @@ const App: React.FC = () => {
                         <div key={i} className="p-4 bg-soft-gray/50 backdrop-blur-md border border-border-gray/50 rounded-[28px] flex justify-between items-center group shadow-lg relative overflow-hidden shadow-black/20">
                           <div className="absolute top-0 left-0 w-1 h-full bg-gold/50"></div>
                           <div className="text-left space-y-1 relative z-10 flex items-center gap-3">
-                            <div className="shrink-0">{w.avatarUrl ? <img src={w.avatarUrl} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-gold/40 shadow-sm object-cover" alt=""/> : <div className="w-8 h-8 bg-matte-black/60 rounded-full flex items-center justify-center border border-gold/20 shadow-inner"><UserIcon className="w-4 h-4 text-gold/40" /></div>}</div>
+                            <div className="shrink-0">
+                              {w.avatarUrl ? (
+                                <img src={w.avatarUrl} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full border border-gold/40 shadow-sm object-cover" alt=""/>
+                              ) : (
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border border-white/10 shadow-inner text-[12px] font-black text-white ${getFallbackColor(w.name)}`}>
+                                  {w.name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
                             <div>
                                <div className="text-[15px] font-black text-white group-hover:text-gold transition-colors tracking-tight flex items-center">
                                  <BlurredWinnerName name={w.name} />
@@ -1160,7 +1204,7 @@ const App: React.FC = () => {
                       </div>
 
                       <div className="p-10 flex flex-col items-center justify-center relative bg-matte-black/40 shadow-inner">
-                        <span className="text-[12px] font-black text-gold/40 uppercase tracking-[0.6em] mb-6 drop-shadow-sm">СТАТУС УЧАСТИЯ</span>
+                        <span className="text-[12px] font-black text-gold/40 uppercase tracking-[0.6em] mb-6 drop-shadow-sm text-center">СТАТУС УЧАСТИЯ</span>
                         <h1 className="text-[40px] font-black italic text-white tracking-tighter leading-none select-none drop-shadow-md uppercase">ПОДТВЕРЖДЕНО</h1>
                         
                         <div className="mt-10 flex items-center gap-3 px-6 py-2.5 bg-gold/5 rounded-full border border-gold/30 backdrop-blur-md shadow-lg shadow-gold/5">
