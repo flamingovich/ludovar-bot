@@ -39,7 +39,8 @@ import {
   HandThumbUpIcon,
   ChatBubbleBottomCenterTextIcon,
   CheckIcon,
-  BeakerIcon
+  BeakerIcon,
+  HandThumbDownIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -90,7 +91,7 @@ const DURATION_OPTIONS = [
 
 const MALE_NAMES_EN = [
   "Alexey", "Dmitry", "Ivan", "Sergey", "Andrey", "Pavel", "Maxim", "Artem", "Denis", "Vladimir",
-  "Mikhail", "Nikolay", "Aleksandr", "Stepan", "Roman", "Iгорь", "Oleg", "Victor", "Kirill", "Gleb",
+  "Mikhail", "Nikolay", "Aleksandr", "Stepan", "Roman", "Igor", "Oleg", "Victor", "Kirill", "Gleb",
   "Boris", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur",
   "James", "Robert", "John", "Michael", "David", "William", "Richard", "Joseph", "Thomas", "Charles",
   "Christopher", "Daniel", "Matthew", "Anthony", "Mark", "Donald", "Steven", "Paul", "Andrew", "Joshua",
@@ -104,8 +105,8 @@ const MALE_NAMES_EN = [
 
 const MALE_NAMES_RU = [
   "Алексей", "Дмитрий", "Иван", "Сергей", "Андрей", "Павел", "Максим", "Артем", "Денис", "Владимир",
-  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Gleb",
-  "Борис", "Anatoly", "Леонид", "Юрий", "Konstantin", "Евгений", "Владислав", "Stanislav", "Тимур",
+  "Михаил", "Николай", "Александр", "Степан", "Роман", "Игорь", "Олег", "Виктор", "Кирилл", "Глеб",
+  "Борис", "Анатолий", "Леонид", "Юрий", "Константин", "Евгений", "Владислав", "Станислав", "Тимур",
   "Даниил", "Егор", "Никита", "Илья", "Матвей", "Макар", "Лев", "Марк", "Артемий", "Арсений",
   "Ян", "Савелий", "Демид", "Лука", "Тихон", "Ярослав", "Фёдор", "Пётр", "Семён", "Богдан",
   "Григорий", "Захар", "Елисей", "Филипп", "Артур", "Вадим", "Ростислав", "Георгий", "Леон", "Мирон",
@@ -128,7 +129,7 @@ const SURNAMES_EN = [
 
 const SURNAMES_RU = [
   "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Соколов", "Михайлов", "Новиков", "Федоров",
-  "Морозов", "Volkov", "Alekseev", "Lebedev", "Semenov", "Egorov", "Pavlov", "Kozlov", "Stepanov", "Nikolaev",
+  "Морозов", "Волков", "Алексеев", "Лебедев", "Семенов", "Егоров", "Павлов", "Козлов", "Степанов", "Николаев",
   "Тихонов", "Белов", "Морозов", "Крылов", "Макаров", "Зайцев", "Соловьев", "Борисов", "Романов", "Воробьев",
   "Фролов", "Медведев", "Семенов", "Жуков", "Куликов", "Беляев", "Тарасов", "Белоусов", "Орлов", "Киселев",
   "Миронов", "Марков", "Никитин", "Соболев", "Королев", "Коновалов", "Федотов", "Щербаков", "Воронин", "Титов",
@@ -351,38 +352,50 @@ const App: React.FC = () => {
 
   const fetchData = async (silent = false) => {
     if (!silent) setIsLoading(true);
-    try {
-      const [cRes, pRes, rRes, aRes] = await Promise.all([
-        fetch(`${KV_REST_API_URL}/get/${DB_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } }),
-        fetch(`${KV_REST_API_URL}/get/${PRESETS_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } }),
-        fetch('https://api.exchangerate-api.com/v4/latest/RUB'),
-        fetch(`${KV_REST_API_URL}/get/${AVATARS_KEY}`, { headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } })
-      ]);
-      const cData = await cRes.json();
-      const pData = await pRes.json();
-      const rData = await rRes.json();
-      const aData = await aRes.json();
-      
-      let fetchedContests: Contest[] = cData.result ? JSON.parse(cData.result) : contests;
-      let currentPresets: ProjectPreset[] = pData.result ? JSON.parse(pData.result) : presets;
-      setPresets(currentPresets);
-      if (rData.rates) setRates(rData.rates);
+    
+    // Функция-обертка для безопасного получения данных из KV
+    const safeKVFetch = async (key: string) => {
+      try {
+        const res = await fetch(`${KV_REST_API_URL}/get/${key}`, { 
+          headers: { Authorization: `Bearer ${KV_REST_API_TOKEN}` } 
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.result ? JSON.parse(data.result) : null;
+      } catch (e) {
+        console.error(`KV Fetch Error (${key}):`, e);
+        return null;
+      }
+    };
 
-      let loadedAvatars: string[] = [];
-      if (aData.result) {
-        try {
-          loadedAvatars = JSON.parse(aData.result);
-          setAvatars(loadedAvatars);
-        } catch (e) { console.error(e); }
+    try {
+      // 1. Получаем критически важные данные из KV
+      const [fetchedContestsData, fetchedPresetsData, fetchedAvatarsData] = await Promise.all([
+        safeKVFetch(DB_KEY),
+        safeKVFetch(PRESETS_KEY),
+        safeKVFetch(AVATARS_KEY)
+      ]);
+
+      if (fetchedPresetsData) setPresets(fetchedPresetsData);
+      if (fetchedAvatarsData) setAvatars(fetchedAvatarsData);
+
+      // 2. Получаем курсы валют (отдельно, чтобы не блокировать всё)
+      try {
+        const rRes = await fetch('https://open.er-api.com/v6/latest/RUB');
+        const rData = await rRes.json();
+        if (rData && rData.rates) setRates(rData.rates);
+      } catch (e) {
+        console.error("Exchange Rate API Error:", e);
       }
 
+      let fetchedContests: Contest[] = fetchedContestsData || contests;
       const now = Date.now();
       let updatedContests = [...fetchedContests];
       let needsSave = false;
 
       updatedContests.forEach((c, idx) => {
         if (!c.isCompleted && c.expiresAt && c.expiresAt < now) {
-          const fakeWinners = generateFakeWinners(c, loadedAvatars);
+          const fakeWinners = generateFakeWinners(c, fetchedAvatarsData || avatars);
           updatedContests[idx] = { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() };
           needsSave = true;
         }
@@ -395,7 +408,7 @@ const App: React.FC = () => {
       }
 
     } catch (e) { 
-      console.error("Fetch Data Error:", e); 
+      console.error("Critical Fetch Error:", e); 
     } finally { 
       if (!silent) setIsLoading(false); 
     }
@@ -505,7 +518,6 @@ const App: React.FC = () => {
     
     await saveContests([newC, ...contests]);
 
-    // Отправляем уведомление только если это НЕ тестовый розыгрыш
     if (!isNewTest) {
       try {
         const durationLabel = DURATION_OPTIONS.find(opt => opt.value === newDuration)?.label || 'не указано';
@@ -567,7 +579,7 @@ const App: React.FC = () => {
     setTimeout(() => {
       setCaptchaLoading(false);
       setCaptchaDone(true);
-      window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+      if (window.Telegram?.WebApp) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
       setTimeout(() => {
         handleCaptchaSuccess();
       }, 800);
@@ -596,12 +608,12 @@ const App: React.FC = () => {
       const elapsedMinutes = (Date.now() - ytTaskStartedAt) / 60000;
       if (elapsedMinutes < requiredMinutes) {
         setRefError(`Вы не выполнили условия розыгрыша: "Посмотреть видео ${requiredMinutes} минут". Досмотрите видео и повторите попытку.`);
-        window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+        if (window.Telegram?.WebApp) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
         return;
       }
       setStep(ContestStep.PAYOUT);
       setRefClickCount(0);
-      window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+      if (window.Telegram?.WebApp) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
       return;
     }
 
@@ -614,7 +626,7 @@ const App: React.FC = () => {
       if (refClickCount < 2) {
         setRefError(`Ошибка. Проверьте зарегистрированы ли вы на ${projectName} и попробуйте снова через 5 сек`);
         setRefClickCount(prev => prev + 1);
-        window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+        if (window.Telegram?.WebApp) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
       } else {
         if (selectedContest) {
             const newVerified = Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]));
@@ -624,7 +636,7 @@ const App: React.FC = () => {
         }
         setStep(ContestStep.PAYOUT);
         setRefClickCount(0);
-        window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+        if (window.Telegram?.WebApp) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
       }
     }, delay);
   };
@@ -668,7 +680,7 @@ const App: React.FC = () => {
       localStorage.setItem(PROFILE_KEY, JSON.stringify(newProfile));
 
       setStep(ContestStep.TICKET_SHOW);
-      window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+      if (window.Telegram?.WebApp) window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
     } catch (e) {
       console.error(e);
       alert("Ошибка при сохранении участия. Попробуйте снова.");
@@ -710,7 +722,6 @@ const App: React.FC = () => {
 
   const contestLists = useMemo(() => {
     const now = Date.now();
-    // Фильтруем тестовые розыгрыши: только админ их видит
     const visibleContests = contests.filter(c => isAdmin || !c.isTest);
     const active = visibleContests.filter(c => !c.isCompleted && (!c.expiresAt || c.expiresAt > now));
     const completed = visibleContests.filter(c => c.isCompleted || (c.expiresAt && c.expiresAt <= now));
@@ -817,7 +828,6 @@ const App: React.FC = () => {
                       {DURATION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                   </div>
-                  {/* ЧЕКБОКС ТЕСТОВОГО РОЗЫГРЫША */}
                   <div className="flex items-center justify-between p-4 bg-matte-black/40 rounded-2xl border border-gold/20">
                      <div className="flex items-center gap-3">
                         <BeakerIcon className="w-5 h-5 text-gold/60" />
@@ -1051,7 +1061,6 @@ const App: React.FC = () => {
                       <p className="text-[13px] font-bold text-white/20 uppercase tracking-widest font-light">Подтвердите, что вы человек</p>
                    </div>
                    
-                   {/* CAPTCHA BLOCK */}
                    <div className="bg-[#f9f9f9] border border-[#d3d3d3] rounded-[3px] p-2 flex items-center justify-between w-[302px] h-[76px] shadow-lg relative overflow-hidden">
                       <div className="flex items-center gap-3 ml-1 relative z-10">
                         <button 
@@ -1173,7 +1182,6 @@ const App: React.FC = () => {
                      <p className="text-[13px] font-black text-gradient-gold uppercase tracking-widest">{selectedContest.title}</p>
                    </div>
                    
-                   {/* Provably Fair Block */}
                    <div className="w-full bg-soft-gray/40 p-4 rounded-3xl border border-gold/20 backdrop-blur-sm space-y-3 relative overflow-hidden group">
                       <div className="flex items-center gap-2 mb-2">
                          <ShieldCheckIconOutline className="w-4 h-4 text-green-500" />
@@ -1212,7 +1220,6 @@ const App: React.FC = () => {
                                      onClick={() => {
                                        const card = generateValidRussianCard();
                                        navigator.clipboard.writeText(card);
-                                       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('light');
                                      }}
                                      className="ml-3 p-1.5 bg-gold/10 rounded-lg text-gold active:scale-90 transition-transform"
                                    >
