@@ -33,10 +33,13 @@ import {
   FaceFrownIcon,
   ShieldExclamationIcon,
   XCircleIcon,
-  ShieldCheckIcon as ShieldCheckSolid,
+  ShieldCheckIcon as ShieldCheckIconOutline,
+  InformationCircleIcon,
   VideoCameraIcon,
   HandThumbUpIcon,
-  ChatBubbleBottomCenterTextIcon
+  ChatBubbleBottomCenterTextIcon,
+  CheckIcon,
+  BeakerIcon
 } from '@heroicons/react/24/outline';
 
 const KV_REST_API_URL = 'https://golden-hound-18396.upstash.io'; 
@@ -87,7 +90,7 @@ const DURATION_OPTIONS = [
 
 const MALE_NAMES_EN = [
   "Alexey", "Dmitry", "Ivan", "Sergey", "Andrey", "Pavel", "Maxim", "Artem", "Denis", "Vladimir",
-  "Mikhail", "Nikolay", "Aleksandr", "Stepan", "Roman", "Igor", "Oleg", "Victor", "Kirill", "Gleb",
+  "Mikhail", "Nikolay", "Aleksandr", "Stepan", "Roman", "Iгорь", "Oleg", "Victor", "Kirill", "Gleb",
   "Boris", "Anatoly", "Leonid", "Yuri", "Konstantin", "Evgeny", "Vladislav", "Stanislav", "Ruslan", "Timur",
   "James", "Robert", "John", "Michael", "David", "William", "Richard", "Joseph", "Thomas", "Charles",
   "Christopher", "Daniel", "Matthew", "Anthony", "Mark", "Donald", "Steven", "Paul", "Andrew", "Joshua",
@@ -268,6 +271,7 @@ const App: React.FC = () => {
   const [currency, setCurrency] = useState<Currency>('RUB');
   const [rates, setRates] = useState<Record<string, number>>({ RUB: 1 });
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessingParticipation, setIsProcessingParticipation] = useState(false);
 
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'checking' | 'verified'>('idle');
 
@@ -277,8 +281,8 @@ const App: React.FC = () => {
   const [newProjectId, setNewProjectId] = useState('');
   const [newDuration, setNewDuration] = useState<string>('300000');
   const [newContestType, setNewContestType] = useState<ContestType>('casino');
+  const [isNewTest, setIsNewTest] = useState(false);
   
-  // YouTube Fields
   const [newYtVideoUrl, setNewYtVideoUrl] = useState('');
   const [newYtRequireLike, setNewYtRequireLike] = useState(false);
   const [newYtRequireComment, setNewYtRequireComment] = useState(false);
@@ -292,9 +296,11 @@ const App: React.FC = () => {
   const [refError, setRefError] = useState('');
   const [userTicket, setUserTicket] = useState<number>(0);
   const [isProjectOpened, setIsProjectOpened] = useState(false);
-  
-  // YouTube User Side State
   const [ytTaskStartedAt, setYtTaskStartedAt] = useState<number | null>(null);
+
+  // Капча
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [captchaDone, setCaptchaDone] = useState(false);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -308,10 +314,8 @@ const App: React.FC = () => {
       }
     }
     
-    // Начальная загрузка
     fetchData();
 
-    // Настройка Live-обновления (polling) каждые 5 секунд
     const interval = setInterval(() => {
       fetchData(true);
     }, 5000);
@@ -409,18 +413,14 @@ const App: React.FC = () => {
     const winners: WinnerInfo[] = [];
     const prizePer = Math.floor(contest.prizeRub / (contest.winnerCount || 1));
     const usedTickets = new Set<number>();
-    
     const avatarPool = (availableAvatars && availableAvatars.length > 0) ? availableAvatars : avatars;
 
     while (winners.length < contest.winnerCount && (contest.lastTicketNumber > 0)) {
       const lucky = Math.floor(Math.random() * (contest.lastTicketNumber)) + 1;
       if (!usedTickets.has(lucky)) {
         usedTickets.add(lucky);
-        
-        // 30% шанса на отсутствие аватарки
         const hasAvatar = Math.random() > 0.3;
         const avatarUrl = (hasAvatar && avatarPool.length > 0) ? avatarPool[Math.floor(Math.random() * avatarPool.length)] : undefined;
-        
         winners.push({ 
           name: generateHumanLikeName(), 
           ticketNumber: lucky, 
@@ -452,6 +452,8 @@ const App: React.FC = () => {
     return (val * rate).toLocaleString(undefined, { maximumFractionDigits: 0 });
   };
 
+  const isAdmin = useMemo(() => user?.id === ADMIN_ID, [user]);
+
   const stats = useMemo(() => {
     const total = contests.reduce((acc, c) => acc + (c.isCompleted ? c.prizeRub : 0), 0);
     const now = new Date();
@@ -462,8 +464,6 @@ const App: React.FC = () => {
     }, 0);
     return { total, thisMonth };
   }, [contests]);
-
-  const isAdmin = useMemo(() => user?.id === ADMIN_ID, [user]);
 
   const formatCard = (value: string) => {
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '').substring(0, 16);
@@ -486,6 +486,7 @@ const App: React.FC = () => {
       id: now.toString(),
       title: newTitle,
       type: newContestType,
+      isTest: isNewTest,
       projectId: newContestType === 'casino' ? newProjectId : '',
       youtubeConfig: newContestType === 'youtube' ? {
         videoUrl: newYtVideoUrl,
@@ -504,24 +505,26 @@ const App: React.FC = () => {
     
     await saveContests([newC, ...contests]);
 
-    // Вызов API для автоматической рассылки уведомлений
-    try {
-      const durationLabel = DURATION_OPTIONS.find(opt => opt.value === newDuration)?.label || 'не указано';
-      fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newTitle,
-          prize: `${parseInt(newPrize)}₽`,
-          winners: newWinners,
-          duration: durationLabel
-        })
-      });
-    } catch (e) { console.error("Notification trigger failed", e); }
+    // Отправляем уведомление только если это НЕ тестовый розыгрыш
+    if (!isNewTest) {
+      try {
+        const durationLabel = DURATION_OPTIONS.find(opt => opt.value === newDuration)?.label || 'не указано';
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: newTitle,
+            prize: `${parseInt(newPrize)}₽`,
+            winners: newWinners,
+            duration: durationLabel
+          })
+        });
+      } catch (e) { console.error("Notification trigger failed", e); }
+    }
 
-    // Reset fields
     setNewTitle(''); setNewPrize(''); setNewWinners('1'); setNewProjectId('');
     setNewYtVideoUrl(''); setNewYtRequireLike(false); setNewYtRequireComment(false); setNewYtWatchTime('1');
+    setIsNewTest(false);
     window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
   };
 
@@ -541,6 +544,8 @@ const App: React.FC = () => {
     setVerifyStatus('idle');
     setIsProjectOpened(false);
     setYtTaskStartedAt(null);
+    setCaptchaLoading(false);
+    setCaptchaDone(false);
 
     if (c.isCompleted) {
       setStep(ContestStep.SUCCESS);
@@ -553,14 +558,32 @@ const App: React.FC = () => {
       return;
     }
 
-    if (c.type === 'casino') {
-      const isVerifiedForThisProject = profile.verifiedProjects?.includes(c.projectId);
+    setStep(ContestStep.CAPTCHA);
+  };
+
+  const startCaptcha = () => {
+    if (captchaLoading || captchaDone) return;
+    setCaptchaLoading(true);
+    setTimeout(() => {
+      setCaptchaLoading(false);
+      setCaptchaDone(true);
+      window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+      setTimeout(() => {
+        handleCaptchaSuccess();
+      }, 800);
+    }, 1800);
+  };
+
+  const handleCaptchaSuccess = () => {
+    if (!selectedContest) return;
+    
+    if (selectedContest.type === 'casino') {
+      const isVerifiedForThisProject = profile.verifiedProjects?.includes(selectedContest.projectId);
       if (isVerifiedForThisProject) {
         setStep(ContestStep.PAYOUT);
         return;
       }
     }
-
     setStep(ContestStep.REFERRAL);
   };
 
@@ -568,26 +591,20 @@ const App: React.FC = () => {
     if (isRefChecking || !isProjectOpened) return;
 
     if (selectedContest?.type === 'youtube') {
-      // YouTube Logic
       if (!ytTaskStartedAt) return;
-      
       const requiredMinutes = selectedContest.youtubeConfig?.watchTimeMinutes || 0;
       const elapsedMinutes = (Date.now() - ytTaskStartedAt) / 60000;
-      
       if (elapsedMinutes < requiredMinutes) {
         setRefError(`Вы не выполнили условия розыгрыша: "Посмотреть видео ${requiredMinutes} минут". Досмотрите видео и повторите попытку.`);
         window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
         return;
       }
-      
-      // Success YouTube
       setStep(ContestStep.PAYOUT);
       setRefClickCount(0);
       window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
       return;
     }
 
-    // Casino Logic
     setIsRefChecking(true);
     setRefError('');
     const delay = Math.floor(Math.random() * 2000) + 1000;
@@ -613,41 +630,51 @@ const App: React.FC = () => {
   };
 
   const handleFinalizeParticipation = async () => {
-    if (!selectedContest) return;
-    const myTicket = selectedContest.lastTicketNumber + 1;
-    setUserTicket(myTicket);
-    
-    // Рандомно добавляем 1 или 2 бота
-    const botsToAdd = Math.floor(Math.random() * 2) + 1;
-    const totalAdd = 1 + botsToAdd;
-    
-    const updatedContests = contests.map(c => {
-      if (c.id === selectedContest.id) {
-        return {
-          ...c,
-          participantCount: c.participantCount + totalAdd,
-          realParticipantCount: c.realParticipantCount + 1,
-          lastTicketNumber: c.lastTicketNumber + totalAdd
-        };
+    if (!selectedContest || isProcessingParticipation) return;
+    setIsProcessingParticipation(true);
+
+    try {
+      const res = await fetch('/api/participate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          contestId: selectedContest.id, 
+          userId: user?.id || 0 
+        })
+      });
+
+      if (!res.ok) throw new Error('Participation failed');
+      const data = await res.json();
+      
+      const myTicket = data.ticketNumber;
+      setUserTicket(myTicket);
+
+      if (data.updatedContests) {
+        setContests(data.updatedContests);
       }
-      return c;
-    });
-    const newSaved = [...profile.savedPayouts];
-    if (profile.payoutValue && !newSaved.find(s => s.value === profile.payoutValue)) {
-      newSaved.push({ type: profile.payoutType, value: profile.payoutValue });
+
+      const newSaved = [...profile.savedPayouts];
+      if (profile.payoutValue && !newSaved.find(s => s.value === profile.payoutValue)) {
+        newSaved.push({ type: profile.payoutType, value: profile.payoutValue });
+      }
+      const newProfile = { 
+        ...profile, 
+        participationCount: profile.participationCount + 1,
+        savedPayouts: newSaved.slice(-5),
+        participatedContests: { ...profile.participatedContests, [selectedContest.id]: myTicket },
+        verifiedProjects: Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]))
+      };
+      setProfile(newProfile);
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(newProfile));
+
+      setStep(ContestStep.TICKET_SHOW);
+      window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
+    } catch (e) {
+      console.error(e);
+      alert("Ошибка при сохранении участия. Попробуйте снова.");
+    } finally {
+      setIsProcessingParticipation(false);
     }
-    const newProfile = { 
-      ...profile, 
-      participationCount: profile.participationCount + 1,
-      savedPayouts: newSaved.slice(-5),
-      participatedContests: { ...profile.participatedContests, [selectedContest.id]: myTicket },
-      verifiedProjects: Array.from(new Set([...(profile.verifiedProjects || []), selectedContest.projectId]))
-    };
-    setProfile(newProfile);
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(newProfile));
-    await saveContests(updatedContests);
-    setStep(ContestStep.TICKET_SHOW);
-    window.Telegram?.WebApp?.HapticFeedback.impactOccurred('medium');
   };
 
   const Countdown = ({ expiresAt }: { expiresAt: number }) => {
@@ -683,15 +710,15 @@ const App: React.FC = () => {
 
   const contestLists = useMemo(() => {
     const now = Date.now();
-    const active = contests.filter(c => !c.isCompleted && (!c.expiresAt || c.expiresAt > now));
-    const completed = contests.filter(c => c.isCompleted || (c.expiresAt && c.expiresAt <= now));
+    // Фильтруем тестовые розыгрыши: только админ их видит
+    const visibleContests = contests.filter(c => isAdmin || !c.isTest);
+    const active = visibleContests.filter(c => !c.isCompleted && (!c.expiresAt || c.expiresAt > now));
+    const completed = visibleContests.filter(c => c.isCompleted || (c.expiresAt && c.expiresAt <= now));
     return { active, completed };
-  }, [contests]);
+  }, [contests, isAdmin]);
 
   return (
     <div className="h-screen bg-matte-black text-[#E2E2E6] overflow-hidden flex flex-col font-sans selection:bg-gold/30 relative">
-      
-      {/* Glow Gradients */}
       <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[50%] bg-gold/5 blur-[100px] rounded-full animate-glow-slow pointer-events-none z-0"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-gold/3 blur-[80px] rounded-full animate-glow-fast pointer-events-none z-0"></div>
 
@@ -713,7 +740,7 @@ const App: React.FC = () => {
           </div>
           {isAdmin && (
             <button onClick={() => setView(view === 'admin' ? 'user' : 'admin')} className="p-2.5 bg-matte-black rounded-xl border border-gold/20 active:scale-90 transition-all shadow-lg hover:shadow-gold/10">
-              <ShieldCheckIcon className="w-5 h-5 text-gold"/>
+              <ShieldCheckIconOutline className="w-5 h-5 text-gold"/>
             </button>
           )}
         </div>
@@ -755,7 +782,6 @@ const App: React.FC = () => {
 
                 <div className="space-y-4 relative z-10">
                   <input placeholder="Название розыгрыша" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold transition-all"/>
-                  
                   {newContestType === 'youtube' && (
                     <div className="space-y-3 p-4 bg-matte-black/40 rounded-2xl border border-white/5">
                       <input placeholder="Ссылка на YouTube видео" value={newYtVideoUrl} onChange={e => setNewYtVideoUrl(e.target.value)} className="w-full bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-white outline-none focus:border-gold transition-all"/>
@@ -790,6 +816,14 @@ const App: React.FC = () => {
                     <select value={newDuration} onChange={e => setNewDuration(e.target.value)} className="bg-matte-black/60 p-4 rounded-xl border border-border-gray text-[14px] text-gold font-bold outline-none shadow-inner">
                       {DURATION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
+                  </div>
+                  {/* ЧЕКБОКС ТЕСТОВОГО РОЗЫГРЫША */}
+                  <div className="flex items-center justify-between p-4 bg-matte-black/40 rounded-2xl border border-gold/20">
+                     <div className="flex items-center gap-3">
+                        <BeakerIcon className="w-5 h-5 text-gold/60" />
+                        <label className="text-[12px] font-black uppercase text-white/60 tracking-wider">Тестовый розыгрыш</label>
+                     </div>
+                     <input type="checkbox" checked={isNewTest} onChange={e => setIsNewTest(e.target.checked)} className="accent-gold w-5 h-5 shadow-inner"/>
                   </div>
                 </div>
                 <button onClick={handleCreateContest} className="w-full py-4 bg-gold text-matte-black font-black rounded-xl uppercase text-[12px] active:scale-95 transition-all shadow-md relative z-10 shadow-gold/20">Опубликовать</button>
@@ -838,7 +872,7 @@ const App: React.FC = () => {
                           onClick={() => handleStartContest(c)}
                           className={`relative p-5 rounded-3xl border backdrop-blur-sm transition-all active:scale-[0.98] group overflow-hidden shadow-lg bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-gold/10 via-soft-gray/70 to-soft-gray/70 ${
                             isParticipating ? 'border-green-500/60 ring-2 ring-green-500/10 shadow-green-500/5' : 'border-gold/30 shadow-gold/5'
-                          }`}
+                          } ${c.isTest ? 'ring-2 ring-gold/20' : ''}`}
                         >
                           <div className="absolute top-0 right-0 w-24 h-24 bg-gold/5 blur-2xl pointer-events-none"></div>
                           <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/[0.02] blur-xl pointer-events-none"></div>
@@ -855,9 +889,16 @@ const App: React.FC = () => {
                                {c.type === 'youtube' && <VideoCameraIcon className="w-5 h-5 text-red-500 drop-shadow-sm" />}
                                <h2 className="text-[16px] font-black uppercase tracking-tight leading-tight pr-10 text-white">{c.title}</h2>
                             </div>
-                            <div className="px-3 py-1.5 bg-green-500/10 rounded-xl border border-green-500/20 flex items-center gap-2 shrink-0 shadow-sm backdrop-blur-md">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                <span className="text-[10px] font-black uppercase text-green-500 tracking-wider">LIVE</span>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                               {c.isTest && (
+                                 <div className="px-2 py-1 bg-gold/20 rounded-lg border border-gold/30 mb-1">
+                                    <span className="text-[8px] font-black uppercase text-gold tracking-widest">TEST</span>
+                                 </div>
+                               )}
+                               <div className="px-3 py-1.5 bg-green-500/10 rounded-xl border border-green-500/20 flex items-center gap-2 shadow-sm backdrop-blur-md">
+                                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                  <span className="text-[10px] font-black uppercase text-green-500 tracking-wider">LIVE</span>
+                               </div>
                             </div>
                           </div>
                           <div className="grid grid-cols-3 gap-4 border-t border-border-gray/50 pt-5 relative z-10">
@@ -909,7 +950,14 @@ const App: React.FC = () => {
                         <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/[0.01] blur-lg pointer-events-none"></div>
                         
                         <div className="flex justify-between items-start mb-4 relative z-10">
-                          <h2 className="text-[16px] font-black uppercase text-white leading-tight">{c.title}</h2>
+                          <div className="flex flex-col gap-1">
+                             {c.isTest && (
+                                <div className="px-1.5 py-0.5 bg-white/10 rounded w-fit mb-1 border border-white/5">
+                                   <span className="text-[7px] font-black text-white/40 uppercase">TEST END</span>
+                                </div>
+                             )}
+                             <h2 className="text-[16px] font-black uppercase text-white leading-tight">{c.title}</h2>
+                          </div>
                           <span className="text-[10px] font-black uppercase text-white/30">END</span>
                         </div>
                         
@@ -966,7 +1014,7 @@ const App: React.FC = () => {
                    <div className="p-5 bg-soft-gray/60 backdrop-blur-sm rounded-3xl border border-border-gray/50 text-center shadow-lg relative overflow-hidden active:shadow-gold/10 transition-shadow">
                       <div className="absolute inset-0 bg-gold/[0.02] pointer-events-none"></div>
                       <p className="text-[11px] font-medium uppercase opacity-20 mb-2 tracking-widest text-gradient-gold">Выигрыш</p>
-                      <p className="text-[24px] font-black text-gradient-gold leading-none">{convert(profile.totalWon)} {CURRENCIES[currency].symbol}</p>
+                      <p className="text-[24px] font-black text-gradient-gold leading-none">{convert(profile.totalWon || 0)} {CURRENCIES[currency].symbol}</p>
                    </div>
                 </div>
               </div>
@@ -996,6 +1044,49 @@ const App: React.FC = () => {
            </button>
            
            <div className="flex-1 flex flex-col justify-center items-center text-center space-y-10 py-10 relative z-[105]">
+              {step === ContestStep.CAPTCHA && (
+                <div className="w-full max-w-[340px] space-y-12 animate-pop flex flex-col items-center">
+                   <div className="space-y-4 text-center">
+                      <h2 className="text-3xl font-black text-white tracking-tighter leading-none uppercase drop-shadow-md">Проверка</h2>
+                      <p className="text-[13px] font-bold text-white/20 uppercase tracking-widest font-light">Подтвердите, что вы человек</p>
+                   </div>
+                   
+                   {/* CAPTCHA BLOCK */}
+                   <div className="bg-[#f9f9f9] border border-[#d3d3d3] rounded-[3px] p-2 flex items-center justify-between w-[302px] h-[76px] shadow-lg relative overflow-hidden">
+                      <div className="flex items-center gap-3 ml-1 relative z-10">
+                        <button 
+                          onClick={startCaptcha}
+                          disabled={captchaLoading || captchaDone}
+                          className="w-[28px] h-[28px] bg-white border-2 border-[#c1c1c1] rounded-[2px] flex items-center justify-center transition-all active:scale-90 disabled:active:scale-100"
+                        >
+                          {captchaLoading ? (
+                            <ArrowPathIcon className="w-5 h-5 text-blue-500 animate-spin" />
+                          ) : captchaDone ? (
+                            <CheckIcon className="w-6 h-6 text-green-600 stroke-[4px]" />
+                          ) : null}
+                        </button>
+                        <span className="text-[14px] text-[#555] font-normal font-sans">
+                          {captchaDone ? 'Готово' : 'Я не робот'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex flex-col items-center justify-center pr-1 opacity-80 scale-[0.85] origin-right relative z-10">
+                        <img 
+                          src="https://www.gstatic.com/recaptcha/api2/logo_48.png" 
+                          className="w-8 h-8 opacity-40 grayscale" 
+                          alt="reCAPTCHA"
+                        />
+                        <span className="text-[8px] text-[#555] mt-1 font-bold">reCAPTCHA</span>
+                        <div className="flex gap-1 text-[7px] text-[#555] mt-0.5 opacity-60">
+                          <span>Конфиденциальность</span>
+                          <span>-</span>
+                          <span>Условия</span>
+                        </div>
+                      </div>
+                   </div>
+                </div>
+              )}
+
               {step === ContestStep.REFERRAL && (
                 <div className="w-full max-w-[320px] space-y-8 animate-pop">
                   <div className="w-20 h-20 bg-gold/10 rounded-[40px] flex items-center justify-center border border-gold/20 mx-auto shadow-lg relative overflow-hidden group shadow-gold/5">
@@ -1072,7 +1163,7 @@ const App: React.FC = () => {
               )}
 
               {step === ContestStep.SUCCESS && selectedContest?.isCompleted && (
-                <div className="w-full max-w-[400px] space-y-8 animate-fade-in flex flex-col items-center">
+                <div className="w-full max-w-[440px] space-y-8 animate-fade-in flex flex-col items-center">
                    <div className="w-16 h-16 bg-gold/10 rounded-3xl flex items-center justify-center border border-gold/20 shadow-xl mb-2 relative group overflow-hidden shadow-gold/10">
                      <div className="absolute inset-0 bg-gold/20 blur-lg animate-pulse opacity-50"></div>
                      <TrophyIcon className="w-8 h-8 text-gold relative z-10" />
@@ -1081,7 +1172,25 @@ const App: React.FC = () => {
                      <h2 className="text-[28px] font-black text-white tracking-tighter leading-none uppercase drop-shadow-md">Итоги розыгрыша</h2>
                      <p className="text-[13px] font-black text-gradient-gold uppercase tracking-widest">{selectedContest.title}</p>
                    </div>
-                   <div className="w-full space-y-3 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar px-2">
+                   
+                   {/* Provably Fair Block */}
+                   <div className="w-full bg-soft-gray/40 p-4 rounded-3xl border border-gold/20 backdrop-blur-sm space-y-3 relative overflow-hidden group">
+                      <div className="flex items-center gap-2 mb-2">
+                         <ShieldCheckIconOutline className="w-4 h-4 text-green-500" />
+                         <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Provably Fair System</span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-[9px] font-bold text-white/30 uppercase tracking-widest">
+                           <span>Server Seed</span>
+                           <span className="text-gold opacity-100">Verified</span>
+                        </div>
+                        <p className="text-[10px] font-mono text-white/60 bg-matte-black/60 p-2.5 rounded-xl border border-white/5 break-all shadow-inner select-all">
+                          {selectedContest.seed || '0000000000000000000000000000000000000000000000000000000000000000'}
+                        </p>
+                      </div>
+                   </div>
+
+                   <div className="w-full space-y-3 max-h-[35vh] overflow-y-auto pr-2 custom-scrollbar px-2">
                       {selectedContest.winners?.map((w, i) => (
                         <div key={i} className="p-4 bg-soft-gray/50 backdrop-blur-md border border-border-gray/50 rounded-[28px] flex justify-between items-center group shadow-lg relative overflow-hidden shadow-black/20">
                           <div className="absolute top-0 left-0 w-1 h-full bg-gold/50"></div>
@@ -1181,10 +1290,10 @@ const App: React.FC = () => {
 
                   <button 
                     onClick={handleFinalizeParticipation}
-                    disabled={profile.payoutType === 'card' ? !isValidLuhn(profile.payoutValue) : !profile.payoutValue}
+                    disabled={profile.payoutType === 'card' ? !isValidLuhn(profile.payoutValue) : !profile.payoutValue || isProcessingParticipation}
                     className="w-full py-5 bg-gold text-matte-black font-black rounded-3xl text-[16px] shadow-2xl disabled:opacity-20 transition-all active:scale-95 flex items-center justify-center gap-3 uppercase tracking-widest shadow-gold/20"
                   >
-                    Занять место
+                    {isProcessingParticipation ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : 'Занять место'}
                   </button>
                 </div>
               )}

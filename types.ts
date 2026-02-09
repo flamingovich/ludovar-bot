@@ -1,4 +1,3 @@
-
 export interface TelegramUser {
   id: number;
   first_name: string;
@@ -56,10 +55,12 @@ export interface Contest {
   winnerCount: number;
   lastTicketNumber: number;
   seed?: string;
+  isTest?: boolean; // Флаг тестового розыгрыша
 }
 
 export enum ContestStep {
   LIST = 'list',
+  CAPTCHA = 'captcha',
   REFERRAL = 'referral',
   PAYOUT = 'payout',
   TICKET_SHOW = 'ticket_show',
