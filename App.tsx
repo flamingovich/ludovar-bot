@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { TelegramUser, ContestStep, PayoutType, Contest, WinnerInfo, UserProfile, ProjectPreset, Currency, ContestType, YoutubeConfig } from './types';
 import { 
@@ -129,7 +130,7 @@ const SURNAMES_EN = [
 
 const SURNAMES_RU = [
   "Иванов", "Петров", "Смирнов", "Кузнецов", "Попов", "Васильев", "Соколов", "Михайлов", "Новиков", "Федоров",
-  "Морозов", "Волков", "Алексеев", "Лебедев", "Семенов", "Егоров", "Павлов", "Козлов", "Степанов", "Николаев",
+  "Морозов", "Волков", "Алексеев", "Лебедев", "Семенов", "Егоров", "Павлов", "Kozlov", "Stepanov", "Nikolaev",
   "Тихонов", "Белов", "Морозов", "Крылов", "Макаров", "Зайцев", "Соловьев", "Борисов", "Романов", "Воробьев",
   "Фролов", "Медведев", "Семенов", "Жуков", "Куликов", "Беляев", "Тарасов", "Белоусов", "Орлов", "Киселев",
   "Миронов", "Марков", "Никитин", "Соболев", "Королев", "Коновалов", "Федотов", "Щербаков", "Воронин", "Титов",
@@ -353,7 +354,6 @@ const App: React.FC = () => {
   const fetchData = async (silent = false) => {
     if (!silent) setIsLoading(true);
     
-    // Функция-обертка для безопасного получения данных из KV
     const safeKVFetch = async (key: string) => {
       try {
         const res = await fetch(`${KV_REST_API_URL}/get/${key}`, { 
@@ -369,7 +369,6 @@ const App: React.FC = () => {
     };
 
     try {
-      // 1. Получаем критически важные данные из KV
       const [fetchedContestsData, fetchedPresetsData, fetchedAvatarsData] = await Promise.all([
         safeKVFetch(DB_KEY),
         safeKVFetch(PRESETS_KEY),
@@ -379,7 +378,6 @@ const App: React.FC = () => {
       if (fetchedPresetsData) setPresets(fetchedPresetsData);
       if (fetchedAvatarsData) setAvatars(fetchedAvatarsData);
 
-      // 2. Получаем курсы валют (отдельно, чтобы не блокировать всё)
       try {
         const rRes = await fetch('https://open.er-api.com/v6/latest/RUB');
         const rData = await rRes.json();
@@ -388,23 +386,10 @@ const App: React.FC = () => {
         console.error("Exchange Rate API Error:", e);
       }
 
-      let fetchedContests: Contest[] = fetchedContestsData || contests;
-      const now = Date.now();
-      let updatedContests = [...fetchedContests];
-      let needsSave = false;
-
-      updatedContests.forEach((c, idx) => {
-        if (!c.isCompleted && c.expiresAt && c.expiresAt < now) {
-          const fakeWinners = generateFakeWinners(c, fetchedAvatarsData || avatars);
-          updatedContests[idx] = { ...c, isCompleted: true, winners: fakeWinners, seed: generateRandomSeed() };
-          needsSave = true;
-        }
-      });
-
-      if (needsSave) {
-        saveContests(updatedContests);
-      } else {
-        setContests(updatedContests);
+      // Логика автоматического завершения на стороне клиента удалена.
+      // Теперь только устанавливаем полученные данные.
+      if (fetchedContestsData) {
+        setContests(fetchedContestsData);
       }
 
     } catch (e) { 
@@ -723,8 +708,8 @@ const App: React.FC = () => {
   const contestLists = useMemo(() => {
     const now = Date.now();
     const visibleContests = contests.filter(c => isAdmin || !c.isTest);
-    const active = visibleContests.filter(c => !c.isCompleted && (!c.expiresAt || c.expiresAt > now));
-    const completed = visibleContests.filter(c => c.isCompleted || (c.expiresAt && c.expiresAt <= now));
+    const active = visibleContests.filter(c => !c.isCompleted);
+    const completed = visibleContests.filter(c => c.isCompleted);
     return { active, completed };
   }, [contests, isAdmin]);
 
@@ -911,18 +896,14 @@ const App: React.FC = () => {
                                </div>
                             </div>
                           </div>
-                          <div className="grid grid-cols-3 gap-4 border-t border-border-gray/50 pt-5 relative z-10">
+                          <div className="grid grid-cols-2 gap-4 border-t border-border-gray/50 pt-5 relative z-10">
                             <div className="space-y-1">
                               <p className="text-[10px] font-bold uppercase opacity-30 tracking-widest text-white">Фонд</p>
                               <p className="text-[17px] font-black tracking-tight text-gradient-gold drop-shadow-sm">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
                             </div>
-                            <div className="space-y-1 text-center">
+                            <div className="space-y-1 text-right">
                               <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest text-white">Мест</p>
                               <p className="text-[14px] font-black text-white">{c.winnerCount}</p>
-                            </div>
-                            <div className="space-y-1 text-right">
-                              <p className="text-[10px] font-bold uppercase opacity-20 tracking-widest text-white">Участников</p>
-                              <p className="text-[14px] font-black text-white">{c.participantCount}</p>
                             </div>
                           </div>
                           {c.expiresAt && (
@@ -988,7 +969,6 @@ const App: React.FC = () => {
 
                         <div className="flex justify-between items-end border-t border-border-gray/20 pt-4 relative z-10 mb-4">
                           <p className="text-[16px] font-black text-gradient-gold opacity-50">{convert(c.prizeRub)} {CURRENCIES[currency].symbol}</p>
-                          <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{c.participantCount} участников</p>
                         </div>
 
                         <div className="w-full py-3 border border-gold/40 rounded-2xl text-[12px] font-black text-gradient-gold uppercase text-center active:scale-95 transition-transform relative z-10">
