@@ -46,6 +46,9 @@ export interface Contest {
   projectId: string; // ID пресета проекта (для casino)
   youtubeConfig?: YoutubeConfig; // Конфиг для youtube
   prizeRub: number;
+  prizeType?: 'money' | 'other';
+  customPrize?: string;
+  imageUrl?: string;
   createdAt: number;
   expiresAt?: number | null;
   participantCount: number; // Общее кол-во билетов
